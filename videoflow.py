@@ -11,6 +11,10 @@ class Runtime:
         CREATE TABLE IF NOT EXISTS deps(parent TEXT REFERENCES scenes(id), child TEXT REFERENCES scenes(id), PRIMARY KEY(parent,child));
         CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY, scene TEXT REFERENCES scenes(id), revision INTEGER, status TEXT, external_id TEXT, asset TEXT, UNIQUE(scene,revision));
         ''')
+        columns = {row['name'] for row in self.db.execute('PRAGMA table_info(tasks)')}
+        if 'backend_url' not in columns:
+            self.db.execute('ALTER TABLE tasks ADD COLUMN backend_url TEXT')
+            self.db.commit()
 
     def add_scene(self, scene, prompt):
         with self.db:
@@ -18,7 +22,7 @@ class Runtime:
             self._task(scene, 1)
 
     def _task(self, scene, revision):
-        self.db.execute('INSERT INTO tasks VALUES (?,?,?,?,?,?)', (uuid.uuid4().hex,scene,revision,'pending',None,None))
+        self.db.execute('INSERT INTO tasks(id,scene,revision,status,external_id,asset) VALUES (?,?,?,?,?,?)', (uuid.uuid4().hex,scene,revision,'pending',None,None))
 
     def affected(self, scene):
         if not self.db.execute('SELECT 1 FROM scenes WHERE id=?',(scene,)).fetchone(): raise ValueError('unknown scene')
@@ -33,7 +37,7 @@ class Runtime:
         with self.db:
             ids=self.affected(scene)
             for sid in ids:
-                self.db.execute("UPDATE tasks SET status='superseded' WHERE scene=? AND status IN ('pending','submitted')",(sid,))
+                self.db.execute("UPDATE tasks SET status='superseded' WHERE scene=? AND status IN ('pending','submitting','submitted')",(sid,))
                 self.db.execute('UPDATE scenes SET revision=revision+1,asset=NULL WHERE id=?',(sid,))
                 rev=self.db.execute('SELECT revision FROM scenes WHERE id=?',(sid,)).fetchone()[0]
                 self._task(sid,rev)
@@ -56,7 +60,7 @@ class Runtime:
             if t['status']=='succeeded':
                 if t['asset'] != asset: raise ValueError('conflicting callback')
                 return 'duplicate'
-            if t['status']!='submitted': raise ValueError('task not submitted')
+            if t['status'] not in ('submitting','submitted'): raise ValueError('task not submitted')
             cur=self.db.execute('UPDATE scenes SET asset=? WHERE id=? AND revision=?',(asset,t['scene'],t['revision']))
             if not cur.rowcount: return 'stale'
             self.db.execute("UPDATE tasks SET status='succeeded',asset=? WHERE id=?",(asset,task))
