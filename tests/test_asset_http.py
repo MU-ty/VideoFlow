@@ -74,6 +74,21 @@ class HttpAssetTests(unittest.TestCase):
         self.assertEqual(self.r.snapshot()['revision'],2)
         self.assertIsNotNone(self.r.snapshot()['timeline'])
 
+    def test_obsolete_http_task_is_still_reconciled(self):
+        pass_once(self.r,self.b,max_submit=20)
+        old=next(j for j in self.r.active() if j['asset']=='S2.video')
+        self.r.edit(dict(id='costume',expected_revision=1,target='S2.video',key='hero.costume',value='black',scope='onward'))
+        self.assertEqual(len(self.r.unresolved_remote(self.b.base)),2)
+        self.finish();log=pass_once(self.r,self.b,max_submit=0)
+        self.assertTrue(any(e.get('result')=='stale' for e in log))
+        recorded=self.r.db.execute('SELECT * FROM vf_jobs WHERE id=?',(old['id'],)).fetchone()
+        self.assertEqual(recorded['status'],'superseded')
+        self.assertEqual(recorded['remote_state'],'succeeded')
+        self.assertEqual(self.r.unresolved_remote(self.b.base),[])
+        pass_once(self.r,self.b,max_submit=1);self.finish();pass_once(self.r,self.b,max_submit=0)
+        self.assertIsNotNone(self.r.snapshot()['timeline'])
+        self.assertNotIn(recorded['remote_output'],[a['output'] for a in self.r.snapshot()['assets']])
+
     def test_http_500_accepted_no_duplicate(self):
         Handler.lose_response=True
         pass_once(self.r,self.b,max_submit=20)

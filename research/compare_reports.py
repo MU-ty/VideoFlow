@@ -13,6 +13,8 @@ def load_run(directory):
     root=Path(directory).resolve()
     config=json.loads((root/'configuration.json').read_text(encoding='utf-8'))
     report=json.loads((root/'report.json').read_text(encoding='utf-8'))
+    if config.get('protocol')!='initial_complete_then_edit_v1':
+        raise ValueError('this tool expects post-generation runs; use compare_dynamic.py for dynamic runs')
     if report['configuration_hash']!=fingerprint(config) or report['method']!=config['method']:
         raise ValueError('configuration/report mismatch')
     if report['status']!='complete' or report['phase']!='complete':

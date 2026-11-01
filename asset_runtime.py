@@ -48,7 +48,9 @@ class AssetRuntime:
         for table, columns in {
             'vf_jobs': {'created_at':'REAL', 'reserved_at':'REAL',
                         'accepted_observed_at':'REAL', 'completed_at':'REAL',
-                        'submission_intents':'INTEGER NOT NULL DEFAULT 0'},
+                        'submission_intents':'INTEGER NOT NULL DEFAULT 0',
+                        'remote_state':'TEXT', 'remote_observed_at':'REAL',
+                        'remote_terminal_at':'REAL', 'remote_output':'TEXT'},
             'vf_events': {'applied_at':'REAL'},
             'vf_timelines': {'published_at':'REAL'},
         }.items():
@@ -238,14 +240,50 @@ class AssetRuntime:
             cur = self.db.execute("UPDATE vf_jobs SET submission_intents=submission_intents+1 WHERE id=? AND status='submitting' AND submission_intents=0", (jid,))
             return cur.rowcount == 1
 
+    def _observe_remote(self, job, state, output=None):
+        if job['backend'] in (None, 'local://subtitle-v1'):
+            return
+        if state not in ('running', 'unknown', 'succeeded', 'failed'):
+            raise ValueError('invalid remote state')
+        if job['remote_state'] in ('succeeded', 'failed'):
+            # Delayed acceptance/queue observations cannot undo a terminal result.
+            if state in ('running', 'unknown'):
+                return
+            if state != job['remote_state'] or (state == 'succeeded' and output != job['remote_output']):
+                raise Conflict('conflicting terminal provider observation')
+            return
+        now = time.time()
+        self.db.execute('UPDATE vf_jobs SET remote_state=?,remote_observed_at=?,remote_terminal_at=?,remote_output=? WHERE id=?',
+                        (state, now, now if state in ('succeeded','failed') else None, output, job['id']))
+
+    def unresolved_remote(self, backend=None):
+        sql = """SELECT * FROM vf_jobs WHERE external_id IS NOT NULL
+                 AND backend IS NOT NULL AND backend!='local://subtitle-v1'
+                 AND status IN ('submitting','submitted','unknown','superseded')
+                 AND (remote_state IS NULL OR remote_state NOT IN ('succeeded','failed'))"""
+        args = ()
+        if backend is not None:
+            sql += ' AND backend=?'
+            args = (backend,)
+        return [dict(j) for j in self.db.execute(sql+' ORDER BY created_at,id', args)]
+
     def mark(self, jid, status, error=None):
         if status not in ('submitted', 'unknown', 'failed'):
             raise ValueError('invalid status')
         with self.transaction():
+            job = self.db.execute('SELECT * FROM vf_jobs WHERE id=?', (jid,)).fetchone()
+            if not job:
+                raise ValueError('unknown task')
+            if job['status'] in ('submitting','submitted','unknown','superseded'):
+                self._observe_remote(job, {'submitted':'running','unknown':'unknown','failed':'failed'}[status])
             self.db.execute("UPDATE vf_jobs SET status=?,error=?,accepted_observed_at=CASE WHEN ?='submitted' THEN COALESCE(accepted_observed_at,?) ELSE accepted_observed_at END WHERE id=? AND status IN ('submitting','submitted','unknown')", (status, error, status, time.time(), jid))
 
-    def active(self):
-        return [dict(j) for j in self.db.execute("SELECT * FROM vf_jobs WHERE status IN ('submitting','submitted','unknown')")]
+    def active(self, include_superseded=False):
+        rows = [dict(j) for j in self.db.execute("SELECT * FROM vf_jobs WHERE status IN ('submitting','submitted','unknown')")]
+        if include_superseded:
+            seen = {j['id'] for j in rows}
+            rows.extend(j for j in self.unresolved_remote() if j['id'] not in seen)
+        return rows
 
     def complete(self, jid, external_id, output):
         if not isinstance(output, str) or not output:
@@ -254,6 +292,7 @@ class AssetRuntime:
             j = self.db.execute('SELECT * FROM vf_jobs WHERE id=?', (jid,)).fetchone()
             if not j or j['external_id'] != external_id:
                 raise ValueError('unknown task/external ID')
+            self._observe_remote(j, 'succeeded', output)
             if j['status'] == 'superseded':
                 return 'stale'
             if j['status'] == 'succeeded':

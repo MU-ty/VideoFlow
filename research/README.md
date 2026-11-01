@@ -1,6 +1,6 @@
-# DAIR research prototype v0.3
+# DAIR research prototype v0.4
 
-目标：动态修改下，在编辑与版本约束下减少不必要的重生成。已实现离线规划、结构化编辑资产执行，以及可恢复的 Full/DAIR 对照和产物归档，仍不是完整论文成果。执行细节见 [EXECUTION.md](EXECUTION.md)，实验入口见 [EXPERIMENTS.md](EXPERIMENTS.md)。
+目标：动态修改下，在编辑与版本约束下减少不必要的重生成。已实现离线规划、结构化编辑资产执行，以及可恢复的 Full/DAIR 对照和产物归档，仍不是完整论文成果。执行细节见 [EXECUTION.md](EXECUTION.md)，实验入口见 [EXPERIMENTS.md](EXPERIMENTS.md)，生成中连续修改见 [DYNAMIC.md](DYNAMIC.md)。
 
 ## 复现
 
