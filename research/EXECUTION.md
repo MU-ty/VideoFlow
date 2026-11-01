@@ -1,4 +1,4 @@
-# DAIR asset execution v0.2
+# DAIR asset execution v0.3
 
 DAIR 的结构化编辑计划现在可通过 `asset_runtime.py` 与 `asset_worker.py` 执行。旧 `worker.py` 保持原来的保守 Scene DAG 行为；新入口使用独立的 `vf_*` 表，一库一个项目，不会自动迁移旧 Scene 数据。
 
@@ -11,7 +11,7 @@ python -m unittest discover -s tests -v
 python research/fault_benchmark.py
 ```
 
-本次 32 项测试通过。故障探针输出 `results/runtime_faults.json`，每次重跑 local_wall_ms 会变化。
+当前 53 项测试通过。故障探针输出 `results/runtime_faults.json`，每次重跑 local_wall_ms 会变化。
 
 | 本地合成执行场景 | 已验证结果 |
 | --- | --- |
@@ -79,8 +79,8 @@ state 边必须声明 keys，父子初始值必须一致；与上游 state 矛�
 
 用户继续编辑可以使旧任务 superseded，但不能取消已进入 ComfyUI 的 GPU 工作。旧任务不再写入当前资产，也不会继续自动跟踪其费用或下载产物。不要把新 revision 当作对未知任务的无风险重试。
 
-视频 output 仍为 ComfyUI `/view` URL，没有下载和内容校验；URL 存活、外部文件不被覆盖尚无保证。当前不包含多机队列、任务租约、自动重试策略、GPU 心跳、视觉质量模型或自然语言编辑解析。
+资产运行时的 output 仍为 ComfyUI `/view` URL。新增实验入口可下载、校验并归档当前完整版本，见 [EXPERIMENTS.md](EXPERIMENTS.md)；首次下载前 URL 对应文件不被覆盖仍无保证。当前不包含多机队列、任务租约、自动重试策略、GPU 心跳、视觉质量模型或自然语言编辑解析。
 
 ## 真实实验仍待完成
 
-当前环境没有接入你的实际 ComfyUI/GPU，本次没有生成真实视频。下一步应在已部署 H3 的服务器上保存基线与编辑后的真实产物、任务耗时和配置，再做独立故事的编辑正确性及一致性盲评。
+当前环境没有接入你的实际 ComfyUI/GPU，本次没有生成真实 H3 视频。新增实验入口已支持归档初始/修改产物、配置、任务 ID 与客户端观测时间；下一步在 H3 服务器采集真实结果，再做独立故事的编辑正确性及一致性盲评。

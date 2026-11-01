@@ -1,0 +1,44 @@
+{
+  "evidence": "synthetic provider, non-video bytes, real local SQLite/archive execution",
+  "protocol": "separate initial generation for each method, then the same costume edit",
+  "results": [
+    {
+      "api_cost": null,
+      "edit_submission_intents": 6,
+      "edit_success_rate": null,
+      "gpu_seconds": null,
+      "method": "full",
+      "planned_regenerate": [
+        "S1.video",
+        "S2.video",
+        "S2.subtitle",
+        "S3.video",
+        "S4.video",
+        "S5.video",
+        "S6.video"
+      ],
+      "planned_reuse": [],
+      "total_submission_intents": 12
+    },
+    {
+      "api_cost": null,
+      "edit_submission_intents": 3,
+      "edit_success_rate": null,
+      "gpu_seconds": null,
+      "method": "dair",
+      "planned_regenerate": [
+        "S2.video",
+        "S4.video",
+        "S6.video"
+      ],
+      "planned_reuse": [
+        "S1.video",
+        "S2.subtitle",
+        "S3.video",
+        "S5.video"
+      ],
+      "total_submission_intents": 9
+    }
+  ],
+  "warning": "Submission intents are not real model executions or monetary savings. No playable video or quality evaluation."
+}

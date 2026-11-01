@@ -66,6 +66,8 @@ def pass_once(runtime, backend, build=build_h3, max_submit=1):
             result = runtime.complete(j['id'], reserved['external_id'], reserved['execution']['text'])
             log.append(dict(job=j['id'], action='subtitle_updated', result=result))
             continue
+        if not runtime.record_submission_intent(j['id']):
+            continue
         submitted += 1
         try:
             backend.submit(reserved['execution'], reserved['external_id'])

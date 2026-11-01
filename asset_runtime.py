@@ -5,9 +5,10 @@ import hashlib
 import json
 import re
 import sqlite3
+import time
 import uuid
 
-from dair import plan
+from dair import Plan, plan
 
 
 def encode(value):
@@ -43,6 +44,18 @@ class AssetRuntime:
         CREATE TABLE IF NOT EXISTS vf_events(id TEXT PRIMARY KEY, payload TEXT NOT NULL, revision INTEGER NOT NULL, plan TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS vf_timelines(revision INTEGER PRIMARY KEY, entries TEXT NOT NULL);
         ''')
+        # Historical records stay NULL: migration must not invent measurements.
+        for table, columns in {
+            'vf_jobs': {'created_at':'REAL', 'reserved_at':'REAL',
+                        'accepted_observed_at':'REAL', 'completed_at':'REAL',
+                        'submission_intents':'INTEGER NOT NULL DEFAULT 0'},
+            'vf_events': {'applied_at':'REAL'},
+            'vf_timelines': {'published_at':'REAL'},
+        }.items():
+            existing = {r['name'] for r in self.db.execute('PRAGMA table_info('+table+')')}
+            for name, definition in columns.items():
+                if name not in existing:
+                    self.db.execute('ALTER TABLE '+table+' ADD COLUMN '+name+' '+definition)
 
     @contextmanager
     def transaction(self):
@@ -67,8 +80,8 @@ class AssetRuntime:
         return self.db.execute('SELECT * FROM vf_assets ORDER BY position').fetchall()
 
     def _job(self, aid, revision):
-        self.db.execute('INSERT INTO vf_jobs(id,asset,revision,status) VALUES (?,?,?,?)',
-                        (uuid.uuid4().hex, aid, revision, 'pending'))
+        self.db.execute('INSERT INTO vf_jobs(id,asset,revision,status,created_at) VALUES (?,?,?,?,?)',
+                        (uuid.uuid4().hex, aid, revision, 'pending', time.time()))
 
     def initialize(self, manifest):
         assets = manifest['assets']
@@ -138,6 +151,12 @@ class AssetRuntime:
             edges = json.loads(project['edges'])
             story = {'scenes':[dict(id=a['id'], cost=specs[a['id']]['cost'], reads=specs[a['id']]['reads']) for a in assets], 'edges':edges}
             p = plan(story, event)  # Execution always uses zero risk budget.
+            method = event.get('method', 'dair')
+            if method == 'full':
+                p = Plan(tuple(a['id'] for a in assets), (), (),
+                         sum(spec['cost'] for spec in specs.values()), 0.0)
+            elif method != 'dair':
+                raise ValueError('execution method must be dair or full')
             selected = set(p.regenerate)
             # State values propagate only across a matching state edge or within scope.
             ids = [a['id'] for a in assets]
@@ -167,7 +186,7 @@ class AssetRuntime:
                 self._job(a['id'], a['revision']+1)
             self.db.execute('UPDATE vf_project SET revision=? WHERE id=1', (revision,))
             result = json.loads(encode(dict(asdict(p), revision=revision, state_changed=sorted(state_changed))))
-            self.db.execute('INSERT INTO vf_events VALUES (?,?,?,?)', (event['id'], payload, revision, encode(result)))
+            self.db.execute('INSERT INTO vf_events(id,payload,revision,plan,applied_at) VALUES (?,?,?,?,?)', (event['id'], payload, revision, encode(result), time.time()))
             self._publish()
             return result
 
@@ -209,15 +228,21 @@ class AssetRuntime:
             execution = build(inputs, jid)  # Must be pure; validated before reservation.
             pid = str(uuid.uuid4())
             digest = fingerprint(dict(inputs=inputs, backend=backend, execution=execution))
-            self.db.execute("UPDATE vf_jobs SET status='submitting',external_id=?,backend=?,input_json=?,execution_json=?,input_hash=? WHERE id=?",
-                            (pid, backend, encode(inputs), encode(execution), digest, jid))
+            self.db.execute("UPDATE vf_jobs SET status='submitting',external_id=?,backend=?,input_json=?,execution_json=?,input_hash=?,reserved_at=? WHERE id=?",
+                            (pid, backend, encode(inputs), encode(execution), digest, time.time(), jid))
             return dict(id=jid, external_id=pid, execution=execution, input_hash=digest)
+
+    def record_submission_intent(self, jid):
+        # Intent is durable before HTTP; a crash here does not prove a POST occurred.
+        with self.transaction():
+            cur = self.db.execute("UPDATE vf_jobs SET submission_intents=submission_intents+1 WHERE id=? AND status='submitting' AND submission_intents=0", (jid,))
+            return cur.rowcount == 1
 
     def mark(self, jid, status, error=None):
         if status not in ('submitted', 'unknown', 'failed'):
             raise ValueError('invalid status')
         with self.transaction():
-            self.db.execute("UPDATE vf_jobs SET status=?,error=? WHERE id=? AND status IN ('submitting','submitted','unknown')", (status, error, jid))
+            self.db.execute("UPDATE vf_jobs SET status=?,error=?,accepted_observed_at=CASE WHEN ?='submitted' THEN COALESCE(accepted_observed_at,?) ELSE accepted_observed_at END WHERE id=? AND status IN ('submitting','submitted','unknown')", (status, error, status, time.time(), jid))
 
     def active(self):
         return [dict(j) for j in self.db.execute("SELECT * FROM vf_jobs WHERE status IN ('submitting','submitted','unknown')")]
@@ -242,7 +267,7 @@ class AssetRuntime:
             if expected != j['input_hash']:
                 self.db.execute("UPDATE vf_jobs SET status='superseded',error='input fingerprint changed' WHERE id=?", (jid,))
                 return 'stale'
-            self.db.execute("UPDATE vf_jobs SET status='succeeded',output=?,error=NULL WHERE id=?", (output, jid))
+            self.db.execute("UPDATE vf_jobs SET status='succeeded',output=?,error=NULL,completed_at=? WHERE id=?", (output, time.time(), jid))
             self.db.execute('UPDATE vf_assets SET output=?,committed_hash=? WHERE id=? AND revision=?',
                             (output, j['input_hash'], j['asset'], j['revision']))
             self._publish()
@@ -261,7 +286,7 @@ class AssetRuntime:
             if expected != a['committed_hash']:
                 raise Conflict('incompatible artifact provenance')
         entries = [dict(asset=a['id'], scene=a['scene'], kind=a['kind'], revision=a['revision'], input_hash=a['committed_hash'], output=a['output']) for a in assets]
-        self.db.execute('INSERT OR IGNORE INTO vf_timelines VALUES (?,?)', (self._project()['revision'], encode(entries)))
+        self.db.execute('INSERT OR IGNORE INTO vf_timelines(revision,entries,published_at) VALUES (?,?,?)', (self._project()['revision'], encode(entries), time.time()))
 
     def snapshot(self):
         with self.transaction():
