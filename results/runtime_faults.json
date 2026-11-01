@@ -1,0 +1,59 @@
+{
+  "evidence": "synthetic execution with an in-memory backend and real local SQLite",
+  "limitations": "Not real provider recovery, GPU cost, video quality, API charges or exactly-once evidence.",
+  "cases": [
+    {
+      "scenario": "subtitle_only",
+      "passed": true,
+      "metrics": {
+        "new_video_submissions": 0,
+        "regenerated_assets": [
+          "S2.subtitle"
+        ]
+      },
+      "local_wall_ms": 17.871529999865743
+    },
+    {
+      "scenario": "costume_onward",
+      "passed": true,
+      "metrics": {
+        "new_video_submissions": 3,
+        "regenerated_assets": [
+          "S2.video",
+          "S4.video",
+          "S6.video"
+        ]
+      },
+      "local_wall_ms": 18.481147000102283
+    },
+    {
+      "scenario": "restart",
+      "passed": true,
+      "metrics": {
+        "additional_submissions_after_restart": 0,
+        "current_timeline_complete": true
+      },
+      "local_wall_ms": 15.62104200002068
+    },
+    {
+      "scenario": "lost_response",
+      "passed": true,
+      "metrics": {
+        "unknown_jobs_preserved": 6,
+        "duplicate_submissions": 0,
+        "current_timeline_complete": true
+      },
+      "local_wall_ms": 15.493829999968511
+    },
+    {
+      "scenario": "stale_callback",
+      "passed": true,
+      "metrics": {
+        "stale_commit_count": 0,
+        "rejected_old_results": 1,
+        "current_timeline_complete": true
+      },
+      "local_wall_ms": 15.16110700003992
+    }
+  ]
+}

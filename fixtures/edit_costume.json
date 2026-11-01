@@ -1,0 +1,8 @@
+{
+  "id": "edit-costume-001",
+  "expected_revision": 1,
+  "target": "S2.video",
+  "key": "hero.costume",
+  "value": "black",
+  "scope": "onward"
+}
