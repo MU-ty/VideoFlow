@@ -1,0 +1,116 @@
+{
+  "assets": [
+    {
+      "id": "S1.video",
+      "scene": "S1",
+      "kind": "video",
+      "spec": {
+        "template": "City cutaway",
+        "reads": [],
+        "values": {},
+        "cost": 10,
+        "config": {
+          "seed": 42
+        }
+      }
+    },
+    {
+      "id": "S2.video",
+      "scene": "S2",
+      "kind": "video",
+      "spec": {
+        "template": "Hero wears {{hero.costume}}, cinematic rooftop scene",
+        "reads": [
+          "hero.costume"
+        ],
+        "values": {
+          "hero.costume": "white"
+        },
+        "cost": 10,
+        "config": {
+          "seed": 42
+        }
+      }
+    },
+    {
+      "id": "S2.subtitle",
+      "scene": "S2",
+      "kind": "subtitle",
+      "spec": {
+        "template": "{{subtitle.text}}",
+        "reads": [
+          "subtitle.text"
+        ],
+        "values": {
+          "subtitle.text": "The chase begins."
+        },
+        "cost": 0.01
+      }
+    },
+    {
+      "id": "S3.video",
+      "scene": "S3",
+      "kind": "video",
+      "spec": {
+        "template": "City cutaway",
+        "reads": [],
+        "values": {},
+        "cost": 10,
+        "config": {
+          "seed": 42
+        }
+      }
+    },
+    {
+      "id": "S4.video",
+      "scene": "S4",
+      "kind": "video",
+      "spec": {
+        "template": "Hero wears {{hero.costume}}, cinematic rooftop scene",
+        "reads": [
+          "hero.costume"
+        ],
+        "values": {
+          "hero.costume": "white"
+        },
+        "cost": 10,
+        "config": {
+          "seed": 42
+        }
+      }
+    },
+    {
+      "id": "S5.video",
+      "scene": "S5",
+      "kind": "video",
+      "spec": {
+        "template": "City cutaway",
+        "reads": [],
+        "values": {},
+        "cost": 10,
+        "config": {
+          "seed": 42
+        }
+      }
+    },
+    {
+      "id": "S6.video",
+      "scene": "S6",
+      "kind": "video",
+      "spec": {
+        "template": "Hero wears {{hero.costume}}, cinematic rooftop scene",
+        "reads": [
+          "hero.costume"
+        ],
+        "values": {
+          "hero.costume": "white"
+        },
+        "cost": 10,
+        "config": {
+          "seed": 42
+        }
+      }
+    }
+  ],
+  "edges": []
+}

@@ -54,13 +54,21 @@ python worker.py --db project.db --server http://127.0.0.1:8188 run-once --workf
 这是单机原型，不具备多 worker 并发租约、自动重试、认证、模型自动下载、分布式队列、自动拼接或视觉一致性评估。仅连接可信的本地服务或通过 SSH 隧道保护远程服务，不要直接公开未鉴权的 ComfyUI。未连接真实 GPU 进行本次端到端验证；测试使用本地模拟 HTTP 服务。原有 `demo.py` 仍是模拟示例，使用新数据库运行。
 
 
-## DAIR 研究原型
+## DAIR 增量研究与资产执行
 
-新增按实体属性与依赖类型规划增量重生成的离线原型、Full/Suffix/DAG 基线及 8 个合成案例。
+新增按实体属性与依赖类型规划增量重生成的 DAIR 原型，以及可恢复的资产级执行入口。视频与字幕分别版本化，字幕编辑不必重生成视频。
 
 ```bash
 python dair.py fixtures/example.json
 python research/benchmark.py
+python research/fault_benchmark.py
+python asset_worker.py --db assets.db init fixtures/assets.json
+python asset_worker.py --db assets.db run-once --server http://127.0.0.1:8188
 ```
 
-方法、结果与局限见 [research/README.md](research/README.md)。当前未接入 worker 自动执行，合成成本不代表真实视频费用或质量改进。
+- [离线算法、基线和证据边界](research/README.md)
+- [资产执行、编辑示例和恢复机制](research/EXECUTION.md)
+
+执行路径为结构化编辑 → DAIR → SQLite 版本化资产任务 → 本地字幕 / ComfyUI H3 → 指纹校验 → 原子 Timeline manifest。旧 `worker.py` 仍执行保守 DAG 失效，使用新入口才能执行 DAIR 计划。
+
+当前 32 项测试通过，包括本地模拟 HTTP 集成。真实 GPU 视频质量与成本尚未验证；字幕目前是文本资产；内置 H3 遇到 reference 依赖会拒绝提交，等待真正的参考加载适配器。

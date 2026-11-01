@@ -1,0 +1,8 @@
+{
+  "id": "edit-subtitle-001",
+  "expected_revision": 1,
+  "target": "S2.subtitle",
+  "key": "subtitle.text",
+  "value": "Run! The bridge is closing.",
+  "scope": "local"
+}
