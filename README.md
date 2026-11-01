@@ -52,3 +52,15 @@ python worker.py --db project.db --server http://127.0.0.1:8188 run-once --workf
 提交前先在 SQLite 中保存客户端生成的 `prompt_id` 和服务地址；重启后通过 `/history/{prompt_id}` 和 `/queue` 查询。提交响应丢失、记录不在队列和历史等情况保留为未知状态，**不自动重新提交**。请在 ComfyUI 检查后人工决定是否通过 `revise` 创建新任务；ComfyUI 清理历史或重启后可能无法判断此前是否执行。客户端 ID 不代表服务端具备幂等保证，不能保证恰好执行一次。提交前崩溃也可能留下未知任务，需要人工处理。
 
 这是单机原型，不具备多 worker 并发租约、自动重试、认证、模型自动下载、分布式队列、自动拼接或视觉一致性评估。仅连接可信的本地服务或通过 SSH 隧道保护远程服务，不要直接公开未鉴权的 ComfyUI。未连接真实 GPU 进行本次端到端验证；测试使用本地模拟 HTTP 服务。原有 `demo.py` 仍是模拟示例，使用新数据库运行。
+
+
+## DAIR 研究原型
+
+新增按实体属性与依赖类型规划增量重生成的离线原型、Full/Suffix/DAG 基线及 8 个合成案例。
+
+```bash
+python dair.py fixtures/example.json
+python research/benchmark.py
+```
+
+方法、结果与局限见 [research/README.md](research/README.md)。当前未接入 worker 自动执行，合成成本不代表真实视频费用或质量改进。

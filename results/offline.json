@@ -1,0 +1,530 @@
+{
+  "scope": "synthetic decision benchmark; costs are arbitrary units; planner_ms is local CPU time; no video quality, GPU latency or API cost measured",
+  "rows": [
+    {
+      "case": "costume_with_cutaways",
+      "method": "full",
+      "precision": 0.5,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 21,
+      "planner_ms": 0.0020530001165752765,
+      "regenerated": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "costume_with_cutaways",
+      "method": "suffix",
+      "precision": 0.6,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.004045999958179891,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "costume_with_cutaways",
+      "method": "dag",
+      "precision": 0.6,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.005637999947794015,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "costume_with_cutaways",
+      "method": "dair",
+      "precision": 1.0,
+      "recall": 1.0,
+      "exact": true,
+      "estimated_cost": 12,
+      "planner_ms": 0.02879399994526466,
+      "regenerated": [
+        "S2",
+        "S4",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "local_camera",
+      "method": "full",
+      "precision": 0.16666666666666666,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 21,
+      "planner_ms": 0.0012010000318696257,
+      "regenerated": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "local_camera",
+      "method": "suffix",
+      "precision": 0.2,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.001281999857383198,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "local_camera",
+      "method": "dag",
+      "precision": 0.2,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.0036359999739943305,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "local_camera",
+      "method": "dair",
+      "precision": 1.0,
+      "recall": 1.0,
+      "exact": true,
+      "estimated_cost": 2,
+      "planner_ms": 0.01611400011825026,
+      "regenerated": [
+        "S2"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "subtitle_only",
+      "method": "full",
+      "precision": 0.16666666666666666,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 21,
+      "planner_ms": 0.0007209998784674099,
+      "regenerated": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "subtitle_only",
+      "method": "suffix",
+      "precision": 0.2,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.0009620000582799548,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "subtitle_only",
+      "method": "dag",
+      "precision": 0.2,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.0030339999739226187,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "subtitle_only",
+      "method": "dair",
+      "precision": 1.0,
+      "recall": 1.0,
+      "exact": true,
+      "estimated_cost": 2,
+      "planner_ms": 0.011667000080706202,
+      "regenerated": [
+        "S2"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "reference_transitive",
+      "method": "full",
+      "precision": 0.5,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 21,
+      "planner_ms": 0.0006409998150047613,
+      "regenerated": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "reference_transitive",
+      "method": "suffix",
+      "precision": 0.6,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.0006909999683557544,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "reference_transitive",
+      "method": "dag",
+      "precision": 0.6,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.004346999958215747,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "reference_transitive",
+      "method": "dair",
+      "precision": 1.0,
+      "recall": 1.0,
+      "exact": true,
+      "estimated_cost": 12,
+      "planner_ms": 0.011878000123033416,
+      "regenerated": [
+        "S2",
+        "S4",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "injury_state",
+      "method": "full",
+      "precision": 0.5,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 21,
+      "planner_ms": 0.0007809999260643963,
+      "regenerated": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "injury_state",
+      "method": "suffix",
+      "precision": 0.6,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.0007310000000870787,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "injury_state",
+      "method": "dag",
+      "precision": 0.6,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.0030950000109442044,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "injury_state",
+      "method": "dair",
+      "precision": 1.0,
+      "recall": 1.0,
+      "exact": true,
+      "estimated_cost": 10,
+      "planner_ms": 0.013170000102036283,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S5"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "other_entity",
+      "method": "full",
+      "precision": 0.16666666666666666,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 21,
+      "planner_ms": 0.0010919998203462455,
+      "regenerated": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "other_entity",
+      "method": "suffix",
+      "precision": 0.2,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.00096099984148168,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "other_entity",
+      "method": "dag",
+      "precision": 0.2,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.0035660000321513508,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "other_entity",
+      "method": "dair",
+      "precision": 1.0,
+      "recall": 1.0,
+      "exact": true,
+      "estimated_cost": 2,
+      "planner_ms": 0.012780000133716385,
+      "regenerated": [
+        "S2"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "global_includes_earlier",
+      "method": "full",
+      "precision": 0.5,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 21,
+      "planner_ms": 0.0006210000265127746,
+      "regenerated": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "global_includes_earlier",
+      "method": "suffix",
+      "precision": 0.4,
+      "recall": 0.6666666666666666,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.003215000106138177,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "global_includes_earlier",
+      "method": "dag",
+      "precision": 0.4,
+      "recall": 0.6666666666666666,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.002514000016162754,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "global_includes_earlier",
+      "method": "dair",
+      "precision": 1.0,
+      "recall": 1.0,
+      "exact": true,
+      "estimated_cost": 7,
+      "planner_ms": 0.010495999958948232,
+      "regenerated": [
+        "S1",
+        "S2",
+        "S4"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "unrelated_state",
+      "method": "full",
+      "precision": 0.16666666666666666,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 21,
+      "planner_ms": 0.0004999999418942025,
+      "regenerated": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "unrelated_state",
+      "method": "suffix",
+      "precision": 0.2,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 20,
+      "planner_ms": 0.0007010000899754232,
+      "regenerated": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "unrelated_state",
+      "method": "dag",
+      "precision": 0.5,
+      "recall": 1.0,
+      "exact": false,
+      "estimated_cost": 5,
+      "planner_ms": 0.0010420001217426034,
+      "regenerated": [
+        "S2",
+        "S3"
+      ],
+      "evidence": "synthetic_annotations"
+    },
+    {
+      "case": "unrelated_state",
+      "method": "dair",
+      "precision": 1.0,
+      "recall": 1.0,
+      "exact": true,
+      "estimated_cost": 2,
+      "planner_ms": 0.006920000032550888,
+      "regenerated": [
+        "S2"
+      ],
+      "evidence": "synthetic_annotations"
+    }
+  ]
+}

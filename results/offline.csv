@@ -1,0 +1,33 @@
+case,method,precision,recall,exact,estimated_cost,planner_ms,regenerated,evidence
+costume_with_cutaways,full,0.5,1.0,False,21,0.0020530001165752765,"['S1', 'S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+costume_with_cutaways,suffix,0.6,1.0,False,20,0.004045999958179891,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+costume_with_cutaways,dag,0.6,1.0,False,20,0.005637999947794015,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+costume_with_cutaways,dair,1.0,1.0,True,12,0.02879399994526466,"['S2', 'S4', 'S6']",synthetic_annotations
+local_camera,full,0.16666666666666666,1.0,False,21,0.0012010000318696257,"['S1', 'S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+local_camera,suffix,0.2,1.0,False,20,0.001281999857383198,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+local_camera,dag,0.2,1.0,False,20,0.0036359999739943305,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+local_camera,dair,1.0,1.0,True,2,0.01611400011825026,['S2'],synthetic_annotations
+subtitle_only,full,0.16666666666666666,1.0,False,21,0.0007209998784674099,"['S1', 'S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+subtitle_only,suffix,0.2,1.0,False,20,0.0009620000582799548,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+subtitle_only,dag,0.2,1.0,False,20,0.0030339999739226187,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+subtitle_only,dair,1.0,1.0,True,2,0.011667000080706202,['S2'],synthetic_annotations
+reference_transitive,full,0.5,1.0,False,21,0.0006409998150047613,"['S1', 'S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+reference_transitive,suffix,0.6,1.0,False,20,0.0006909999683557544,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+reference_transitive,dag,0.6,1.0,False,20,0.004346999958215747,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+reference_transitive,dair,1.0,1.0,True,12,0.011878000123033416,"['S2', 'S4', 'S6']",synthetic_annotations
+injury_state,full,0.5,1.0,False,21,0.0007809999260643963,"['S1', 'S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+injury_state,suffix,0.6,1.0,False,20,0.0007310000000870787,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+injury_state,dag,0.6,1.0,False,20,0.0030950000109442044,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+injury_state,dair,1.0,1.0,True,10,0.013170000102036283,"['S2', 'S3', 'S5']",synthetic_annotations
+other_entity,full,0.16666666666666666,1.0,False,21,0.0010919998203462455,"['S1', 'S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+other_entity,suffix,0.2,1.0,False,20,0.00096099984148168,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+other_entity,dag,0.2,1.0,False,20,0.0035660000321513508,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+other_entity,dair,1.0,1.0,True,2,0.012780000133716385,['S2'],synthetic_annotations
+global_includes_earlier,full,0.5,1.0,False,21,0.0006210000265127746,"['S1', 'S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+global_includes_earlier,suffix,0.4,0.6666666666666666,False,20,0.003215000106138177,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+global_includes_earlier,dag,0.4,0.6666666666666666,False,20,0.002514000016162754,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+global_includes_earlier,dair,1.0,1.0,True,7,0.010495999958948232,"['S1', 'S2', 'S4']",synthetic_annotations
+unrelated_state,full,0.16666666666666666,1.0,False,21,0.0004999999418942025,"['S1', 'S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+unrelated_state,suffix,0.2,1.0,False,20,0.0007010000899754232,"['S2', 'S3', 'S4', 'S5', 'S6']",synthetic_annotations
+unrelated_state,dag,0.5,1.0,False,5,0.0010420001217426034,"['S2', 'S3']",synthetic_annotations
+unrelated_state,dair,1.0,1.0,True,2,0.006920000032550888,['S2'],synthetic_annotations
