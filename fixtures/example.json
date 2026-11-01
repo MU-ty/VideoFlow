@@ -1,0 +1,74 @@
+{
+  "story": {
+    "scenes": [
+      {
+        "id": "S1",
+        "cost": 1,
+        "reads": []
+      },
+      {
+        "id": "S2",
+        "cost": 2,
+        "reads": [
+          "hero.costume"
+        ]
+      },
+      {
+        "id": "S3",
+        "cost": 3,
+        "reads": []
+      },
+      {
+        "id": "S4",
+        "cost": 4,
+        "reads": [
+          "hero.costume"
+        ]
+      },
+      {
+        "id": "S5",
+        "cost": 5,
+        "reads": []
+      },
+      {
+        "id": "S6",
+        "cost": 6,
+        "reads": [
+          "hero.costume"
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "parent": "S1",
+        "child": "S2",
+        "kind": "order"
+      },
+      {
+        "parent": "S2",
+        "child": "S3",
+        "kind": "order"
+      },
+      {
+        "parent": "S3",
+        "child": "S4",
+        "kind": "order"
+      },
+      {
+        "parent": "S4",
+        "child": "S5",
+        "kind": "order"
+      },
+      {
+        "parent": "S5",
+        "child": "S6",
+        "kind": "order"
+      }
+    ]
+  },
+  "edit": {
+    "target": "S2",
+    "key": "hero.costume",
+    "scope": "onward"
+  }
+}

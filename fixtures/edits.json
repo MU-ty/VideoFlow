@@ -1,0 +1,615 @@
+[
+  {
+    "id": "costume_with_cutaways",
+    "story": {
+      "scenes": [
+        {
+          "id": "S1",
+          "cost": 1,
+          "reads": []
+        },
+        {
+          "id": "S2",
+          "cost": 2,
+          "reads": [
+            "hero.costume"
+          ]
+        },
+        {
+          "id": "S3",
+          "cost": 3,
+          "reads": []
+        },
+        {
+          "id": "S4",
+          "cost": 4,
+          "reads": [
+            "hero.costume"
+          ]
+        },
+        {
+          "id": "S5",
+          "cost": 5,
+          "reads": []
+        },
+        {
+          "id": "S6",
+          "cost": 6,
+          "reads": [
+            "hero.costume"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "parent": "S1",
+          "child": "S2",
+          "kind": "order"
+        },
+        {
+          "parent": "S2",
+          "child": "S3",
+          "kind": "order"
+        },
+        {
+          "parent": "S3",
+          "child": "S4",
+          "kind": "order"
+        },
+        {
+          "parent": "S4",
+          "child": "S5",
+          "kind": "order"
+        },
+        {
+          "parent": "S5",
+          "child": "S6",
+          "kind": "order"
+        }
+      ]
+    },
+    "edit": {
+      "target": "S2",
+      "key": "hero.costume",
+      "scope": "onward"
+    },
+    "expected": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  },
+  {
+    "id": "local_camera",
+    "story": {
+      "scenes": [
+        {
+          "id": "S1",
+          "cost": 1,
+          "reads": []
+        },
+        {
+          "id": "S2",
+          "cost": 2,
+          "reads": [
+            "camera"
+          ]
+        },
+        {
+          "id": "S3",
+          "cost": 3,
+          "reads": []
+        },
+        {
+          "id": "S4",
+          "cost": 4,
+          "reads": []
+        },
+        {
+          "id": "S5",
+          "cost": 5,
+          "reads": []
+        },
+        {
+          "id": "S6",
+          "cost": 6,
+          "reads": []
+        }
+      ],
+      "edges": [
+        {
+          "parent": "S1",
+          "child": "S2",
+          "kind": "order"
+        },
+        {
+          "parent": "S2",
+          "child": "S3",
+          "kind": "order"
+        },
+        {
+          "parent": "S3",
+          "child": "S4",
+          "kind": "order"
+        },
+        {
+          "parent": "S4",
+          "child": "S5",
+          "kind": "order"
+        },
+        {
+          "parent": "S5",
+          "child": "S6",
+          "kind": "order"
+        }
+      ]
+    },
+    "edit": {
+      "target": "S2",
+      "key": "camera",
+      "scope": "local"
+    },
+    "expected": [
+      "S2"
+    ]
+  },
+  {
+    "id": "subtitle_only",
+    "story": {
+      "scenes": [
+        {
+          "id": "S1",
+          "cost": 1,
+          "reads": []
+        },
+        {
+          "id": "S2",
+          "cost": 2,
+          "reads": [
+            "subtitle.text"
+          ]
+        },
+        {
+          "id": "S3",
+          "cost": 3,
+          "reads": []
+        },
+        {
+          "id": "S4",
+          "cost": 4,
+          "reads": []
+        },
+        {
+          "id": "S5",
+          "cost": 5,
+          "reads": []
+        },
+        {
+          "id": "S6",
+          "cost": 6,
+          "reads": []
+        }
+      ],
+      "edges": [
+        {
+          "parent": "S1",
+          "child": "S2",
+          "kind": "order"
+        },
+        {
+          "parent": "S2",
+          "child": "S3",
+          "kind": "order"
+        },
+        {
+          "parent": "S3",
+          "child": "S4",
+          "kind": "order"
+        },
+        {
+          "parent": "S4",
+          "child": "S5",
+          "kind": "order"
+        },
+        {
+          "parent": "S5",
+          "child": "S6",
+          "kind": "order"
+        }
+      ]
+    },
+    "edit": {
+      "target": "S2",
+      "key": "subtitle.text",
+      "scope": "local"
+    },
+    "expected": [
+      "S2"
+    ]
+  },
+  {
+    "id": "reference_transitive",
+    "story": {
+      "scenes": [
+        {
+          "id": "S1",
+          "cost": 1,
+          "reads": []
+        },
+        {
+          "id": "S2",
+          "cost": 2,
+          "reads": []
+        },
+        {
+          "id": "S3",
+          "cost": 3,
+          "reads": []
+        },
+        {
+          "id": "S4",
+          "cost": 4,
+          "reads": []
+        },
+        {
+          "id": "S5",
+          "cost": 5,
+          "reads": []
+        },
+        {
+          "id": "S6",
+          "cost": 6,
+          "reads": []
+        }
+      ],
+      "edges": [
+        {
+          "parent": "S1",
+          "child": "S2",
+          "kind": "order"
+        },
+        {
+          "parent": "S2",
+          "child": "S3",
+          "kind": "order"
+        },
+        {
+          "parent": "S3",
+          "child": "S4",
+          "kind": "order"
+        },
+        {
+          "parent": "S4",
+          "child": "S5",
+          "kind": "order"
+        },
+        {
+          "parent": "S5",
+          "child": "S6",
+          "kind": "order"
+        },
+        {
+          "parent": "S2",
+          "child": "S4",
+          "kind": "reference"
+        },
+        {
+          "parent": "S4",
+          "child": "S6",
+          "kind": "reference"
+        }
+      ]
+    },
+    "edit": {
+      "target": "S2",
+      "key": "camera",
+      "scope": "local"
+    },
+    "expected": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  },
+  {
+    "id": "injury_state",
+    "story": {
+      "scenes": [
+        {
+          "id": "S1",
+          "cost": 1,
+          "reads": []
+        },
+        {
+          "id": "S2",
+          "cost": 2,
+          "reads": []
+        },
+        {
+          "id": "S3",
+          "cost": 3,
+          "reads": []
+        },
+        {
+          "id": "S4",
+          "cost": 4,
+          "reads": []
+        },
+        {
+          "id": "S5",
+          "cost": 5,
+          "reads": []
+        },
+        {
+          "id": "S6",
+          "cost": 6,
+          "reads": []
+        }
+      ],
+      "edges": [
+        {
+          "parent": "S1",
+          "child": "S2",
+          "kind": "order"
+        },
+        {
+          "parent": "S2",
+          "child": "S3",
+          "kind": "order"
+        },
+        {
+          "parent": "S3",
+          "child": "S4",
+          "kind": "order"
+        },
+        {
+          "parent": "S4",
+          "child": "S5",
+          "kind": "order"
+        },
+        {
+          "parent": "S5",
+          "child": "S6",
+          "kind": "order"
+        },
+        {
+          "parent": "S2",
+          "child": "S3",
+          "kind": "state",
+          "keys": [
+            "hero.injury"
+          ]
+        },
+        {
+          "parent": "S3",
+          "child": "S5",
+          "kind": "state",
+          "keys": [
+            "hero.injury"
+          ]
+        }
+      ]
+    },
+    "edit": {
+      "target": "S2",
+      "key": "hero.injury",
+      "scope": "local"
+    },
+    "expected": [
+      "S2",
+      "S3",
+      "S5"
+    ]
+  },
+  {
+    "id": "other_entity",
+    "story": {
+      "scenes": [
+        {
+          "id": "S1",
+          "cost": 1,
+          "reads": [
+            "villain.costume"
+          ]
+        },
+        {
+          "id": "S2",
+          "cost": 2,
+          "reads": [
+            "hero.costume"
+          ]
+        },
+        {
+          "id": "S3",
+          "cost": 3,
+          "reads": [
+            "villain.costume"
+          ]
+        },
+        {
+          "id": "S4",
+          "cost": 4,
+          "reads": []
+        },
+        {
+          "id": "S5",
+          "cost": 5,
+          "reads": []
+        },
+        {
+          "id": "S6",
+          "cost": 6,
+          "reads": []
+        }
+      ],
+      "edges": [
+        {
+          "parent": "S1",
+          "child": "S2",
+          "kind": "order"
+        },
+        {
+          "parent": "S2",
+          "child": "S3",
+          "kind": "order"
+        },
+        {
+          "parent": "S3",
+          "child": "S4",
+          "kind": "order"
+        },
+        {
+          "parent": "S4",
+          "child": "S5",
+          "kind": "order"
+        },
+        {
+          "parent": "S5",
+          "child": "S6",
+          "kind": "order"
+        }
+      ]
+    },
+    "edit": {
+      "target": "S2",
+      "key": "hero.costume",
+      "scope": "global"
+    },
+    "expected": [
+      "S2"
+    ]
+  },
+  {
+    "id": "global_includes_earlier",
+    "story": {
+      "scenes": [
+        {
+          "id": "S1",
+          "cost": 1,
+          "reads": [
+            "hero.costume"
+          ]
+        },
+        {
+          "id": "S2",
+          "cost": 2,
+          "reads": []
+        },
+        {
+          "id": "S3",
+          "cost": 3,
+          "reads": []
+        },
+        {
+          "id": "S4",
+          "cost": 4,
+          "reads": [
+            "hero.costume"
+          ]
+        },
+        {
+          "id": "S5",
+          "cost": 5,
+          "reads": []
+        },
+        {
+          "id": "S6",
+          "cost": 6,
+          "reads": []
+        }
+      ],
+      "edges": [
+        {
+          "parent": "S1",
+          "child": "S2",
+          "kind": "order"
+        },
+        {
+          "parent": "S2",
+          "child": "S3",
+          "kind": "order"
+        },
+        {
+          "parent": "S3",
+          "child": "S4",
+          "kind": "order"
+        },
+        {
+          "parent": "S4",
+          "child": "S5",
+          "kind": "order"
+        },
+        {
+          "parent": "S5",
+          "child": "S6",
+          "kind": "order"
+        }
+      ]
+    },
+    "edit": {
+      "target": "S2",
+      "key": "hero.costume",
+      "scope": "global"
+    },
+    "expected": [
+      "S1",
+      "S2",
+      "S4"
+    ]
+  },
+  {
+    "id": "unrelated_state",
+    "story": {
+      "scenes": [
+        {
+          "id": "S1",
+          "cost": 1,
+          "reads": []
+        },
+        {
+          "id": "S2",
+          "cost": 2,
+          "reads": []
+        },
+        {
+          "id": "S3",
+          "cost": 3,
+          "reads": []
+        },
+        {
+          "id": "S4",
+          "cost": 4,
+          "reads": []
+        },
+        {
+          "id": "S5",
+          "cost": 5,
+          "reads": []
+        },
+        {
+          "id": "S6",
+          "cost": 6,
+          "reads": []
+        }
+      ],
+      "edges": [
+        {
+          "parent": "S2",
+          "child": "S3",
+          "kind": "state",
+          "keys": [
+            "hero.injury"
+          ]
+        }
+      ]
+    },
+    "edit": {
+      "target": "S2",
+      "key": "hero.costume",
+      "scope": "local"
+    },
+    "expected": [
+      "S2"
+    ]
+  }
+]
