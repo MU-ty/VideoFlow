@@ -8,7 +8,8 @@ import sqlite3
 import time
 import uuid
 
-from dair import Plan, plan
+from dair import plan
+from planning import execution_plan
 
 
 def encode(value):
@@ -43,6 +44,8 @@ class AssetRuntime:
         CREATE TABLE IF NOT EXISTS vf_jobs(id TEXT PRIMARY KEY, asset TEXT NOT NULL REFERENCES vf_assets(id), revision INTEGER NOT NULL, status TEXT NOT NULL, external_id TEXT, backend TEXT, input_json TEXT, execution_json TEXT, input_hash TEXT, output TEXT, error TEXT, UNIQUE(asset,revision));
         CREATE TABLE IF NOT EXISTS vf_events(id TEXT PRIMARY KEY, payload TEXT NOT NULL, revision INTEGER NOT NULL, plan TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS vf_timelines(revision INTEGER PRIMARY KEY, entries TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS vf_provider_environment(id INTEGER PRIMARY KEY,backend TEXT NOT NULL,observed_at REAL NOT NULL,payload TEXT,error TEXT);
+        CREATE TABLE IF NOT EXISTS vf_provider_inspections(id INTEGER PRIMARY KEY,job TEXT NOT NULL REFERENCES vf_jobs(id),backend TEXT NOT NULL,payload TEXT NOT NULL,first_seen_at REAL NOT NULL,UNIQUE(job,backend,payload));
         ''')
         # Historical records stay NULL: migration must not invent measurements.
         for table, columns in {
@@ -152,13 +155,7 @@ class AssetRuntime:
                 raise ValueError('edit must target a declared input attribute')
             edges = json.loads(project['edges'])
             story = {'scenes':[dict(id=a['id'], cost=specs[a['id']]['cost'], reads=specs[a['id']]['reads']) for a in assets], 'edges':edges}
-            p = plan(story, event)  # Execution always uses zero risk budget.
-            method = event.get('method', 'dair')
-            if method == 'full':
-                p = Plan(tuple(a['id'] for a in assets), (), (),
-                         sum(spec['cost'] for spec in specs.values()), 0.0)
-            elif method != 'dair':
-                raise ValueError('execution method must be dair or full')
+            p = execution_plan(story, event, event.get('method','dair'))
             selected = set(p.regenerate)
             # State values propagate only across a matching state edge or within scope.
             ids = [a['id'] for a in assets]

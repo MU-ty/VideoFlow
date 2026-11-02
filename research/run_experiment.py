@@ -14,6 +14,8 @@ from artifacts import archive_current, write_json
 from asset_runtime import AssetRuntime, Conflict, fingerprint
 from asset_worker import pass_once
 from comfyui import ComfyUI
+from planning import METHODS
+from provider_audit import summarize_inspections, capture_environment
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -50,7 +52,8 @@ def summarize(runtime, state, status, evidence, error=None):
     return dict(status=status, evidence=evidence, method=state['method'], configuration_hash=state['configuration_hash'],
                 phase=state['phase'], error=error, project_revision=snapshot['revision'],
                 worker_passes=state['passes'], sessions=state['sessions'],
-                metrics=dict(total_submission_intents=sum(j['submission_intents'] for j in jobs),
+                provider_observations=summarize_inspections(runtime),
+        metrics=dict(total_submission_intents=sum(j['submission_intents'] for j in jobs),
                     edit_submission_intents=sum(j['submission_intents'] for j in edited),
                     edit_completion_observed_seconds=latency,
                     planned_regenerate=None if p is None else p['regenerate'],
@@ -69,8 +72,8 @@ def summarize(runtime, state, status, evidence, error=None):
 def run(manifest, edit, directory, *, method='dair', server='http://127.0.0.1:8188',
         poll_seconds=5, timeout_seconds=7200, max_inflight=1, max_passes=None,
         probe=False, backend=None, downloader=None):
-    if method not in ('dair','full'):
-        raise ValueError('method must be dair or full')
+    if method not in METHODS:
+        raise ValueError('unknown execution method')
     if not math.isfinite(poll_seconds) or not 0<=poll_seconds<=60 or not math.isfinite(timeout_seconds) or timeout_seconds<0:
         raise ValueError('poll_seconds must be 0..60; timeout_seconds must be nonnegative')
     if max_inflight<1 or (max_passes is not None and max_passes<0):
@@ -83,7 +86,7 @@ def run(manifest, edit, directory, *, method='dair', server='http://127.0.0.1:81
                          max_inflight=max_inflight, probe=probe, evidence=evidence,
                          protocol='initial_complete_then_edit_v1',
                          source_hashes={p:fingerprint((ROOT/p).read_text(encoding='utf-8')) for p in
-                                        ('asset_runtime.py','asset_worker.py','comfyui.py','dair.py','artifacts.py','research/run_experiment.py')})
+                                        ('asset_runtime.py','asset_worker.py','comfyui.py','dair.py','planning.py','provider_audit.py','artifacts.py','research/run_experiment.py')})
     configuration_hash = fingerprint(configuration)
     with runner_lock(root):
         state_path = root/'state.json'
@@ -107,6 +110,7 @@ def run(manifest, edit, directory, *, method='dair', server='http://127.0.0.1:81
         try:
             if not runtime.db.execute('SELECT 1 FROM vf_project').fetchone():
                 runtime.initialize(manifest)
+            capture_environment(runtime,backend)
             while True:
                 snapshot = runtime.snapshot()
                 if snapshot['timeline'] is not None:
@@ -156,7 +160,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--manifest',default='fixtures/assets.json')
     p.add_argument('--edit',default='fixtures/edit_costume.json')
-    p.add_argument('--method',choices=('dair','full'),default='dair')
+    p.add_argument('--method',choices=METHODS,default='dair')
     p.add_argument('--server',default='http://127.0.0.1:8188')
     p.add_argument('--output',required=True)
     p.add_argument('--poll-seconds',type=float,default=5)

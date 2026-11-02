@@ -73,7 +73,7 @@ python asset_worker.py --db assets.db run-once --server http://127.0.0.1:8188
 
 执行路径为结构化编辑 → DAIR → SQLite 版本化资产任务 → 本地字幕 / ComfyUI H3 → 指纹校验 → 原子 Timeline manifest。旧 `worker.py` 仍执行保守 DAG 失效，使用新入口才能执行 DAIR 计划。
 
-当前 67 项测试通过，包括本地模拟 HTTP 集成、产物归档、连续动态修改、旧任务跟踪、实验恢复及可执行 Full 对照。真实 GPU 视频质量与成本尚未验证；字幕目前是文本资产；内置 H3 遇到 reference 依赖会拒绝提交，等待真正的参考加载适配器。
+当前 75 项测试通过，包括本地模拟 HTTP 集成、产物归档、连续动态修改、旧任务跟踪、实验恢复及可执行 Full 对照。真实 GPU 视频质量与成本尚未验证；字幕目前是文本资产；内置 H3 遇到 reference 依赖会拒绝提交，等待真正的参考加载适配器。
 
 运行不调用模型的实验演示：
 
@@ -96,3 +96,7 @@ python research/mock_dynamic.py --output runs/dynamic-mock
 ```
 
 真实服务入口为 `research/run_dynamic.py`。旧版本任务失效后仍会查询并占用未决槽位；旧结果仅记录，不进入当前 Timeline。
+
+## 冻结案例与扩展基线
+
+可用 `research/freeze_case.py` 在本地生成实验冻结副本和校验清单；实验数据不随代码发布。新增 `suffix_safe`、`dag` 可执行基线和原始 ComfyUI 历史/缓存观测记录，操作与度量边界见 [research/BASELINES.md](research/BASELINES.md)。

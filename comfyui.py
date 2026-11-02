@@ -12,10 +12,14 @@ class ComfyUI:
         self.base=base.rstrip('/')
         if not self.base.startswith(('http://','https://')): raise ValueError('server must be an HTTP(S) URL')
         self.timeout=timeout
+        self.last_inspection=None
     def _request(self, path, data=None):
         body=None if data is None else json.dumps(data).encode()
         req=request.Request(self.base+path, data=body, headers={'Content-Type':'application/json'})
         with request.urlopen(req, timeout=self.timeout) as res: return json.load(res)
+    def environment(self):
+        return self._request('/system_stats')
+
     def submit(self, workflow, prompt_id):
         try:
             result=self._request('/prompt',{'prompt':workflow,'prompt_id':prompt_id,'client_id':prompt_id})
@@ -30,9 +34,11 @@ class ComfyUI:
             raise SubmissionUncertain(f'Unexpected prompt response; inspect job {prompt_id}: {result}')
         return prompt_id
     def inspect(self, prompt_id):
+        self.last_inspection=None
         pid=parse.quote(prompt_id,safe='')
         history=self._request('/history/'+pid)
         entry=history.get(prompt_id)
+        self.last_inspection={'prompt_id':prompt_id,'history_entry':entry,'queue':None}
         if entry is not None:
             status=entry.get('status',{})
             if status.get('status_str') == 'error': return ('failed',json.dumps(status,ensure_ascii=False))
@@ -51,6 +57,7 @@ class ComfyUI:
                 return ('succeeded',self.base+'/view?'+params)
             return ('running',None)
         queue=self._request('/queue')
+        self.last_inspection['queue']={field:[item for item in queue.get(field,[]) if (isinstance(item,list) and len(item)>1 and item[1]==prompt_id) or (isinstance(item,dict) and item.get('prompt_id')==prompt_id)] for field in ('queue_running','queue_pending')}
         for field in ('queue_running','queue_pending'):
             for item in queue.get(field,[]):
                 if (isinstance(item,list) and len(item)>1 and item[1]==prompt_id) or (isinstance(item,dict) and item.get('prompt_id')==prompt_id):
@@ -83,3 +90,4 @@ def render_template(template, prompt, node, field):
         raise ValueError('prompt node/input not found in API-format workflow')
     graph[node]['inputs'][field]=prompt
     return graph
+
