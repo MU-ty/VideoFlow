@@ -1,0 +1,152 @@
+{
+  "assets": [
+    {
+      "id": "S1.video",
+      "kind": "video",
+      "scene": "S1",
+      "spec": {
+        "config": {
+          "seed": 1001
+        },
+        "cost": 10,
+        "reads": [],
+        "template": "A wide establishing shot of a modern city skyline in clear daylight. Distant buildings and a rooftop antenna. Slow camera pan. No people visible. Realistic live-action cinematography.",
+        "values": {}
+      }
+    },
+    {
+      "id": "S2.video",
+      "kind": "video",
+      "scene": "S2",
+      "spec": {
+        "config": {
+          "seed": 42
+        },
+        "cost": 10,
+        "reads": [
+          "hero.costume"
+        ],
+        "template": "A medium frontal shot of A young adult East Asian man with short black hair, wearing a {{hero.costume}} jacket over a plain white T-shirt. He stands on a rooftop in clear daylight and slowly turns toward the camera. His upper body and the entire jacket remain clearly visible throughout the shot. Neutral natural lighting, realistic live-action cinematography, stable camera.",
+        "values": {
+          "hero.costume": "clean white"
+        }
+      }
+    },
+    {
+      "id": "S2.subtitle",
+      "kind": "subtitle",
+      "scene": "S2",
+      "spec": {
+        "cost": 0.01,
+        "reads": [
+          "subtitle.text"
+        ],
+        "template": "{{subtitle.text}}",
+        "values": {
+          "subtitle.text": "The chase begins."
+        }
+      }
+    },
+    {
+      "id": "S3.video",
+      "kind": "video",
+      "scene": "S3",
+      "spec": {
+        "config": {
+          "seed": 1003
+        },
+        "cost": 10,
+        "reads": [],
+        "template": "An empty outdoor concrete staircase leading to a rooftop exit. A green metal door and yellow handrail in clear daylight. Slow forward camera movement. No people visible. Realistic live-action cinematography.",
+        "values": {}
+      }
+    },
+    {
+      "id": "S4.video",
+      "kind": "video",
+      "scene": "S4",
+      "spec": {
+        "config": {
+          "seed": 1004
+        },
+        "cost": 10,
+        "reads": [
+          "hero.costume"
+        ],
+        "template": "A medium three-quarter side shot of A young adult East Asian man with short black hair, wearing a {{hero.costume}} jacket over a plain white T-shirt. He walks slowly along a rooftop beside a low concrete wall in clear daylight. The camera tracks beside him. His upper body and jacket remain clearly visible. Neutral natural lighting, realistic live-action cinematography.",
+        "values": {
+          "hero.costume": "clean white"
+        }
+      }
+    },
+    {
+      "id": "S5.video",
+      "kind": "video",
+      "scene": "S5",
+      "spec": {
+        "config": {
+          "seed": 1005
+        },
+        "cost": 10,
+        "reads": [],
+        "template": "A wide shot of a steel bridge with moving cars above a river in clear daylight. The camera is stationary. No pedestrians visible. Realistic live-action cinematography.",
+        "values": {}
+      }
+    },
+    {
+      "id": "S6.video",
+      "kind": "video",
+      "scene": "S6",
+      "spec": {
+        "config": {
+          "seed": 1006
+        },
+        "cost": 10,
+        "reads": [
+          "hero.costume"
+        ],
+        "template": "A medium frontal shot of A young adult East Asian man with short black hair, wearing a {{hero.costume}} jacket over a plain white T-shirt. He stops beside a rooftop ventilation unit, then turns his head toward the camera. Clear daylight. His upper body and jacket remain clearly visible throughout. Neutral natural lighting, realistic live-action cinematography, stable camera.",
+        "values": {
+          "hero.costume": "clean white"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "child": "S2.video",
+      "kind": "order",
+      "parent": "S1.video"
+    },
+    {
+      "child": "S3.video",
+      "kind": "order",
+      "parent": "S2.video"
+    },
+    {
+      "child": "S4.video",
+      "kind": "order",
+      "parent": "S3.video"
+    },
+    {
+      "child": "S5.video",
+      "kind": "order",
+      "parent": "S4.video"
+    },
+    {
+      "child": "S6.video",
+      "kind": "order",
+      "parent": "S5.video"
+    },
+    {
+      "child": "S4.video",
+      "kind": "reference",
+      "parent": "S2.video"
+    },
+    {
+      "child": "S6.video",
+      "kind": "reference",
+      "parent": "S4.video"
+    }
+  ]
+}

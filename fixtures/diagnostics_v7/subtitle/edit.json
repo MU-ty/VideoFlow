@@ -1,0 +1,8 @@
+{
+  "expected_revision": 1,
+  "id": "subtitle-update",
+  "key": "subtitle.text",
+  "scope": "local",
+  "target": "S2.subtitle",
+  "value": "We must leave now."
+}

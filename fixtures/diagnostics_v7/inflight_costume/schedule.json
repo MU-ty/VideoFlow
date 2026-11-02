@@ -1,0 +1,31 @@
+[
+  {
+    "edit": {
+      "expected_revision": 1,
+      "id": "inflight-black",
+      "key": "hero.costume",
+      "scope": "local",
+      "target": "S2.video",
+      "value": "solid black"
+    },
+    "trigger": {
+      "after_submission_intents": 2,
+      "asset": "S2.video",
+      "revision": 1
+    }
+  },
+  {
+    "edit": {
+      "expected_revision": 2,
+      "id": "inflight-blue",
+      "key": "hero.costume",
+      "scope": "local",
+      "target": "S2.video",
+      "value": "bright saturated royal-blue"
+    },
+    "trigger": {
+      "asset": "S2.video",
+      "revision": 2
+    }
+  }
+]

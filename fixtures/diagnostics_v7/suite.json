@@ -1,0 +1,41 @@
+{
+  "cases": [
+    {
+      "id": "state_costume",
+      "input": "state_costume/edit.json",
+      "manifest": "state_costume/manifest.json",
+      "mode": "post"
+    },
+    {
+      "id": "local_costume",
+      "input": "local_costume/edit.json",
+      "manifest": "local_costume/manifest.json",
+      "mode": "post"
+    },
+    {
+      "id": "subtitle",
+      "input": "subtitle/edit.json",
+      "manifest": "subtitle/manifest.json",
+      "mode": "post"
+    },
+    {
+      "id": "global_light",
+      "input": "global_light/edit.json",
+      "manifest": "global_light/manifest.json",
+      "mode": "post"
+    },
+    {
+      "id": "reference_change",
+      "input": "reference_change/edit.json",
+      "manifest": "reference_change/manifest.json",
+      "mode": "reference_plan_only"
+    },
+    {
+      "id": "inflight_costume",
+      "input": "inflight_costume/schedule.json",
+      "manifest": "inflight_costume/manifest.json",
+      "mode": "dynamic"
+    }
+  ],
+  "classification": "designed diagnostic suite; not held out"
+}

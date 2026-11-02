@@ -1,0 +1,8 @@
+{
+  "expected_revision": 1,
+  "id": "global-light",
+  "key": "scene.light",
+  "scope": "global",
+  "target": "S1.video",
+  "value": "warm sunset illumination"
+}
