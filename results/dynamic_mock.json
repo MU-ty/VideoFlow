@@ -1,0 +1,25 @@
+{
+  "api_cost": null,
+  "evidence": "synthetic_injected_backend",
+  "gpu_seconds": null,
+  "interpretation": "Matched client-state triggers, not a fixed wall-clock arrival trace. Single designed case with no quality or cost conclusion.",
+  "matched_configuration_hash": "874faa085fe49da2d076feaba83f008fc925b87cfa63e382e42e11ebd0f6349b",
+  "quality_comparison": null,
+  "rows": [
+    {
+      "max_remote_unresolved_observed": 2,
+      "method": "full",
+      "remote_unresolved": 0,
+      "stale_results_observed": 4,
+      "submission_intents": 10
+    },
+    {
+      "max_remote_unresolved_observed": 2,
+      "method": "dair",
+      "remote_unresolved": 0,
+      "stale_results_observed": 2,
+      "submission_intents": 8
+    }
+  ],
+  "warning": "Synthetic provider returns prompt bytes, not videos. Inflight means unresolved client state, not evidence of physical GPU execution."
+}

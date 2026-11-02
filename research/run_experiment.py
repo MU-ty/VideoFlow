@@ -126,7 +126,7 @@ def run(manifest, edit, directory, *, method='dair', server='http://127.0.0.1:81
                     state['phase']='edited'; write_json(state_path,state)
                 if time.monotonic()-started>=timeout_seconds or (max_passes is not None and passes>=max_passes):
                     break
-                active = sum(j['backend']==backend.base for j in runtime.active())
+                active = len(runtime.unresolved_remote(backend.base))
                 log = pass_once(runtime,backend,max_submit=max(0,max_inflight-active))
                 state['passes']+=1; passes+=1
                 write_json(state_path,state)

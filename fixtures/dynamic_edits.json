@@ -1,0 +1,10 @@
+[
+  {
+    "trigger": {"after_submission_intents": 2, "asset": "S2.video", "revision": 1},
+    "edit": {"id": "dynamic-black-001", "target": "S2.video", "key": "hero.costume", "value": "black", "scope": "onward"}
+  },
+  {
+    "trigger": {"asset": "S2.video", "revision": 2},
+    "edit": {"id": "dynamic-blue-002", "target": "S2.video", "key": "hero.costume", "value": "blue", "scope": "onward"}
+  }
+]

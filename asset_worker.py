@@ -26,7 +26,7 @@ def pass_once(runtime, backend, build=build_h3, max_submit=1):
     if max_submit < 0:
         raise ValueError('max_submit must be nonnegative')
     log = []
-    for j in runtime.active():
+    for j in runtime.active(include_superseded=True):
         if j['backend'] == LOCAL:
             result = runtime.complete(j['id'], j['external_id'], json.loads(j['execution_json'])['text'])
             log.append(dict(job=j['id'], action='subtitle_recovered', result=result))
