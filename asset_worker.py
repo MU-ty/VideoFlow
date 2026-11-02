@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from asset_runtime import AssetRuntime, render
+from provider_audit import save_inspection
 from comfyui import ComfyUI, SubmissionRejected, SubmissionUncertain, h3_workflow
 
 LOCAL = 'local://subtitle-v1'
@@ -35,6 +36,7 @@ def pass_once(runtime, backend, build=build_h3, max_submit=1):
         else:
             try:
                 state, value = backend.inspect(j['external_id'])
+                save_inspection(runtime,backend,j)
                 if state == 'succeeded':
                     result = runtime.complete(j['id'], j['external_id'], value)
                     log.append(dict(job=j['id'], action='complete', result=result))

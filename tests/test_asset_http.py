@@ -71,6 +71,7 @@ class HttpAssetTests(unittest.TestCase):
         self.r.edit(dict(id='sub',expected_revision=1,target='S2.subtitle',key='subtitle.text',value='Run!',scope='local'))
         pass_once(self.r,self.b)
         self.assertEqual(Handler.posts,2)
+        self.assertGreater(self.r.db.execute('SELECT COUNT(*) FROM vf_provider_inspections').fetchone()[0],0)
         self.assertEqual(self.r.snapshot()['revision'],2)
         self.assertIsNotNone(self.r.snapshot()['timeline'])
 

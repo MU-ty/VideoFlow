@@ -13,12 +13,14 @@ from artifacts import archive_current, write_json
 from asset_runtime import AssetRuntime, Conflict, fingerprint
 from asset_worker import pass_once
 from comfyui import ComfyUI
+from planning import METHODS
+from provider_audit import summarize_inspections, capture_environment
 from research.run_experiment import ROOT, runner_lock
 
 
 def validate_schedule(manifest, schedule, method):
-    if method not in ('dair','full'):
-        raise ValueError('method must be dair or full')
+    if method not in METHODS:
+        raise ValueError('unknown execution method')
     if not isinstance(schedule, list) or not schedule:
         raise ValueError('schedule must be a nonempty ordered list')
     assets = {a['id']:a for a in manifest['assets']}
@@ -102,6 +104,7 @@ def report_dynamic(runtime, state, status, evidence, events, error):
         configuration_hash=state['configuration_hash'],method=state['method'],sessions=state['sessions'],
         current_revision=snapshot['revision'],project_ready=snapshot['timeline'] is not None,
         applied_events=len(event_rows),scheduled_events=len(events),events=event_reports,
+        provider_observations=summarize_inspections(runtime),
         metrics=dict(submission_intents=sum(j['submission_intents'] for j in jobs),
             stale_results_observed=len(stale),superseded_remote_unresolved=sum(j['status']=='superseded' for j in unresolved),
             remote_unresolved=len(unresolved),max_remote_unresolved_observed=state['max_remote_unresolved'],
@@ -128,7 +131,7 @@ def run_dynamic(manifest, schedule, directory, *, method='dair',server='http://1
     configuration=dict(protocol='inflight_edit_sequence_v1',manifest=manifest,events=events,method=method,
         backend=backend.base,max_inflight=max_inflight,probe=probe,evidence=evidence,
         source_hashes={p:fingerprint((ROOT/p).read_text(encoding='utf-8')) for p in
-            ('asset_runtime.py','asset_worker.py','comfyui.py','dair.py','artifacts.py','research/run_experiment.py','research/run_dynamic.py')})
+            ('asset_runtime.py','asset_worker.py','comfyui.py','dair.py','planning.py','provider_audit.py','artifacts.py','research/run_experiment.py','research/run_dynamic.py')})
     signature=fingerprint(configuration)
     with runner_lock(root):
         state_path=root/'state.json'
@@ -148,6 +151,7 @@ def run_dynamic(manifest, schedule, directory, *, method='dair',server='http://1
         try:
             if not runtime.db.execute('SELECT 1 FROM vf_project').fetchone():
                 runtime.initialize(manifest)
+            capture_environment(runtime,backend)
             while True:
                 index=applied_prefix(runtime,events)
                 snapshot=runtime.snapshot()
@@ -194,7 +198,7 @@ def run_dynamic(manifest, schedule, directory, *, method='dair',server='http://1
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--manifest',default='fixtures/assets.json');p.add_argument('--schedule',default='fixtures/dynamic_edits.json')
-    p.add_argument('--method',choices=('dair','full'),default='dair');p.add_argument('--server',default='http://127.0.0.1:8188')
+    p.add_argument('--method',choices=METHODS,default='dair');p.add_argument('--server',default='http://127.0.0.1:8188')
     p.add_argument('--output',required=True);p.add_argument('--poll-seconds',type=float,default=5);p.add_argument('--timeout-seconds',type=float,default=7200)
     p.add_argument('--max-inflight',type=int,default=1);p.add_argument('--max-passes',type=int);p.add_argument('--probe',action='store_true')
     a=p.parse_args()
