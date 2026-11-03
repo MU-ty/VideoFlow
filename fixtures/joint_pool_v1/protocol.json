@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "joint-pool-v1",
+  "stories": [
+    {"id": "greenhouse", "source_block": "greenhouse-seed-42", "contract": "All three edited shots show the same single royal-blue metal watering can: a cylindrical body, one large arched carrying handle, one long narrow spout with a round sprinkler head. Keep these physical components and their proportions consistent across camera views. Preserve the greenhouse setting and the action requested for each shot."},
+    {"id": "harbor", "source_block": "harbor-seed-42", "contract": "All three edited shots show the same single royal-blue fabric backpack: a rounded rectangular body, one front zip pocket, one top carrying loop and two shoulder straps. Keep these physical components and their proportions consistent across camera views. Preserve the ferry-terminal setting and the action requested for each shot."}
+  ],
+  "shots": ["S2", "S4", "S6"],
+  "locked_shots": ["S1", "S3", "S5"],
+  "seed_offsets": [0, 1000003],
+  "generation_order_seed": 29001,
+  "blind_order_seed": 29002,
+  "max_inflight": 2,
+  "poll_seconds": 5,
+  "generation": {"width": 864, "height": 480, "frames": 124, "steps": 20},
+  "individual_rule": "Among candidates with edit_success=yes, maximize single_quality (1..5); break ties by anonymous candidate id. No admissible candidate means abstain.",
+  "joint_rule": "Among combinations whose candidates all have edit_success=yes, maximize joint_quality (1..5); break ties by anonymous combination id. This is a retrospective human oracle, not a deployed method.",
+  "pilot_signal": "A descriptive signal exists only if both stories have oracle minus independent joint_quality >= 1 and oracle acceptable=yes. Two stories do not establish a stable population effect.",
+  "evidence_scope": "Fixed candidate pool; text-conditioned H3, no new reference weights. Canonical shape requirements are new controlled-task specifications, not relabelled failures of earlier accepted videos. Locked context shots contain no identity anchor for the edited product. Playback is muted; audio is outside scoring. No adaptive budget policy is evaluated."
+}
