@@ -1,0 +1,143 @@
+{
+  "assets": [
+    {
+      "id": "S1.video",
+      "kind": "video",
+      "scene": "S1",
+      "spec": {
+        "config": {
+          "seed": 42
+        },
+        "cost": 10,
+        "reads": [],
+        "template": "A wide establishing shot of a quiet ferry harbor with white boats and wooden docks. No backpack visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {}
+      }
+    },
+    {
+      "id": "S2.video",
+      "kind": "video",
+      "scene": "S2",
+      "spec": {
+        "config": {
+          "seed": 139
+        },
+        "cost": 10,
+        "reads": [
+          "prop.color"
+        ],
+        "template": "A {{prop.color}} fabric backpack stands upright on a wooden ferry-terminal bench beside a folded map. The full backpack remains visible. Close-up, slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {
+          "prop.color": "clean white"
+        }
+      }
+    },
+    {
+      "id": "S3.video",
+      "kind": "video",
+      "scene": "S3",
+      "spec": {
+        "config": {
+          "seed": 236
+        },
+        "cost": 10,
+        "reads": [],
+        "template": "A close-up of white ferry ropes tied to a metal dock cleat beside the water. No backpack visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {}
+      }
+    },
+    {
+      "id": "S4.video",
+      "kind": "video",
+      "scene": "S4",
+      "spec": {
+        "config": {
+          "seed": 333
+        },
+        "cost": 10,
+        "reads": [
+          "prop.color"
+        ],
+        "template": "Close-up of hands opening a {{prop.color}} fabric backpack on a wooden ferry-terminal bench and putting a folded map inside. The backpack remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {
+          "prop.color": "clean white"
+        }
+      }
+    },
+    {
+      "id": "S5.video",
+      "kind": "video",
+      "scene": "S5",
+      "spec": {
+        "config": {
+          "seed": 430
+        },
+        "cost": 10,
+        "reads": [],
+        "template": "A wide shot of a white ferry slowly leaving a quiet harbor. No passengers or backpacks visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {}
+      }
+    },
+    {
+      "id": "S6.video",
+      "kind": "video",
+      "scene": "S6",
+      "spec": {
+        "config": {
+          "seed": 527
+        },
+        "cost": 10,
+        "reads": [
+          "prop.color"
+        ],
+        "template": "Close-up of a {{prop.color}} fabric backpack being gently set beside a wooden harbor railing. The full backpack remains visible against distant white boats. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {
+          "prop.color": "clean white"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "child": "S2.video",
+      "kind": "order",
+      "parent": "S1.video"
+    },
+    {
+      "child": "S3.video",
+      "kind": "order",
+      "parent": "S2.video"
+    },
+    {
+      "child": "S4.video",
+      "kind": "order",
+      "parent": "S3.video"
+    },
+    {
+      "child": "S5.video",
+      "kind": "order",
+      "parent": "S4.video"
+    },
+    {
+      "child": "S6.video",
+      "kind": "order",
+      "parent": "S5.video"
+    },
+    {
+      "child": "S4.video",
+      "keys": [
+        "prop.color"
+      ],
+      "kind": "state",
+      "parent": "S2.video"
+    },
+    {
+      "child": "S6.video",
+      "keys": [
+        "prop.color"
+      ],
+      "kind": "state",
+      "parent": "S4.video"
+    }
+  ]
+}

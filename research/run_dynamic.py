@@ -131,7 +131,7 @@ def run_dynamic(manifest, schedule, directory, *, method='dair',server='http://1
     configuration=dict(protocol='inflight_edit_sequence_v1',manifest=manifest,events=events,method=method,
         backend=backend.base,max_inflight=max_inflight,probe=probe,evidence=evidence,
         source_hashes={p:fingerprint((ROOT/p).read_text(encoding='utf-8')) for p in
-            ('asset_runtime.py','asset_worker.py','comfyui.py','dair.py','planning.py','provider_audit.py','artifacts.py','research/run_experiment.py','research/run_dynamic.py')})
+            ('asset_runtime.py','asset_worker.py','comfyui.py','dair.py','planning.py','attribute_baseline.py','provider_audit.py','artifacts.py','research/run_experiment.py','research/run_dynamic.py')})
     signature=fingerprint(configuration)
     with runner_lock(root):
         state_path=root/'state.json'

@@ -1,0 +1,8 @@
+{
+  "expected_revision": 1,
+  "id": "harbor-blue",
+  "key": "prop.color",
+  "scope": "local",
+  "target": "S2.video",
+  "value": "bright saturated royal-blue"
+}

@@ -86,7 +86,7 @@ def run(manifest, edit, directory, *, method='dair', server='http://127.0.0.1:81
                          max_inflight=max_inflight, probe=probe, evidence=evidence,
                          protocol='initial_complete_then_edit_v1',
                          source_hashes={p:fingerprint((ROOT/p).read_text(encoding='utf-8')) for p in
-                                        ('asset_runtime.py','asset_worker.py','comfyui.py','dair.py','planning.py','provider_audit.py','artifacts.py','research/run_experiment.py')})
+                                        ('asset_runtime.py','asset_worker.py','comfyui.py','dair.py','planning.py','attribute_baseline.py','provider_audit.py','artifacts.py','research/run_experiment.py')})
     configuration_hash = fingerprint(configuration)
     with runner_lock(root):
         state_path = root/'state.json'

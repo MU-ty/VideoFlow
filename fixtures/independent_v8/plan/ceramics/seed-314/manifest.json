@@ -1,0 +1,143 @@
+{
+  "assets": [
+    {
+      "id": "S1.video",
+      "kind": "video",
+      "scene": "S1",
+      "spec": {
+        "config": {
+          "seed": 314
+        },
+        "cost": 10,
+        "reads": [],
+        "template": "A wide establishing shot of a small pottery workshop. Shelves of unglazed bowls and a wooden workbench. No teapot visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {}
+      }
+    },
+    {
+      "id": "S2.video",
+      "kind": "video",
+      "scene": "S2",
+      "spec": {
+        "config": {
+          "seed": 411
+        },
+        "cost": 10,
+        "reads": [
+          "prop.color"
+        ],
+        "template": "Close-up of a {{prop.color}} glazed ceramic teapot standing on a wooden pottery workbench. The entire teapot remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {
+          "prop.color": "clean white"
+        }
+      }
+    },
+    {
+      "id": "S3.video",
+      "kind": "video",
+      "scene": "S3",
+      "spec": {
+        "config": {
+          "seed": 508
+        },
+        "cost": 10,
+        "reads": [],
+        "template": "A potter shapes a small plain clay bowl on a spinning wheel. No teapot visible. Close-up of hands and wet clay. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {}
+      }
+    },
+    {
+      "id": "S4.video",
+      "kind": "video",
+      "scene": "S4",
+      "spec": {
+        "config": {
+          "seed": 605
+        },
+        "cost": 10,
+        "reads": [
+          "prop.color"
+        ],
+        "template": "A potter pours water from a {{prop.color}} glazed ceramic teapot into a plain white cup on a wooden workbench. Close-up, the teapot stays clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {
+          "prop.color": "clean white"
+        }
+      }
+    },
+    {
+      "id": "S5.video",
+      "kind": "video",
+      "scene": "S5",
+      "spec": {
+        "config": {
+          "seed": 702
+        },
+        "cost": 10,
+        "reads": [],
+        "template": "A wide view of a closed pottery kiln and shelves of raw clay bowls. No teapot visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {}
+      }
+    },
+    {
+      "id": "S6.video",
+      "kind": "video",
+      "scene": "S6",
+      "spec": {
+        "config": {
+          "seed": 799
+        },
+        "cost": 10,
+        "reads": [
+          "prop.color"
+        ],
+        "template": "A {{prop.color}} glazed ceramic teapot sits beside a white cup on a wooden table in a pottery workshop. A hand gently rotates the teapot. Close-up. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+        "values": {
+          "prop.color": "clean white"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "child": "S2.video",
+      "kind": "order",
+      "parent": "S1.video"
+    },
+    {
+      "child": "S3.video",
+      "kind": "order",
+      "parent": "S2.video"
+    },
+    {
+      "child": "S4.video",
+      "kind": "order",
+      "parent": "S3.video"
+    },
+    {
+      "child": "S5.video",
+      "kind": "order",
+      "parent": "S4.video"
+    },
+    {
+      "child": "S6.video",
+      "kind": "order",
+      "parent": "S5.video"
+    },
+    {
+      "child": "S4.video",
+      "keys": [
+        "prop.color"
+      ],
+      "kind": "state",
+      "parent": "S2.video"
+    },
+    {
+      "child": "S6.video",
+      "keys": [
+        "prop.color"
+      ],
+      "kind": "state",
+      "parent": "S4.video"
+    }
+  ]
+}

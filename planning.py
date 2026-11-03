@@ -1,10 +1,13 @@
 """Executable baselines share edit semantics and hard provenance constraints."""
 from dair import Plan, plan
 
-METHODS = ('dair', 'full', 'suffix_safe', 'dag')
+METHODS = ('dair', 'full', 'suffix_safe', 'dag', 'attr_dag')
 
 
 def execution_plan(story, edit, method='dair'):
+    if method == 'attr_dag':
+        from attribute_baseline import attribute_plan
+        return attribute_plan(story, edit)
     typed = plan(story, edit)  # Zero-risk execution; no oracle labels are read.
     ids = [s['id'] for s in story['scenes']]
     if method not in METHODS:
