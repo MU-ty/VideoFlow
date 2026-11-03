@@ -1,0 +1,172 @@
+{
+  "annotation_status": "author expectation only; independent review required before quality metrics",
+  "blocks": [
+    {
+      "edit": "ceramics/seed-42/edit.json",
+      "edit_hash": "5b290f1a9ce00cf18ba7ac430f05b63eb4a5df4695cd016aa4040cca714abd54",
+      "id": "ceramics-seed-42",
+      "manifest": "ceramics/seed-42/manifest.json",
+      "manifest_hash": "829aa448b7d9a4e16fea0e49a9cbb4a53b2d7ada9540b09eeaaf47478603901e",
+      "method_order": [
+        "attr_dag",
+        "dag",
+        "dair",
+        "suffix_safe",
+        "full"
+      ],
+      "seed": 42,
+      "story": "ceramics"
+    },
+    {
+      "edit": "ceramics/seed-314/edit.json",
+      "edit_hash": "5b290f1a9ce00cf18ba7ac430f05b63eb4a5df4695cd016aa4040cca714abd54",
+      "id": "ceramics-seed-314",
+      "manifest": "ceramics/seed-314/manifest.json",
+      "manifest_hash": "4c215399c2042bfe683a2f5c5193b0fde016cafda1410b6fbb0eb834a4bb1634",
+      "method_order": [
+        "dag",
+        "attr_dag",
+        "full",
+        "dair",
+        "suffix_safe"
+      ],
+      "seed": 314,
+      "story": "ceramics"
+    },
+    {
+      "edit": "ceramics/seed-2718/edit.json",
+      "edit_hash": "5b290f1a9ce00cf18ba7ac430f05b63eb4a5df4695cd016aa4040cca714abd54",
+      "id": "ceramics-seed-2718",
+      "manifest": "ceramics/seed-2718/manifest.json",
+      "manifest_hash": "ca414bb17a68d782a526aea99adf4a4477657afefafb0e5878486c573213f704",
+      "method_order": [
+        "dag",
+        "suffix_safe",
+        "attr_dag",
+        "full",
+        "dair"
+      ],
+      "seed": 2718,
+      "story": "ceramics"
+    },
+    {
+      "edit": "greenhouse/seed-42/edit.json",
+      "edit_hash": "48364bf2a313bebf9876db153b59d0a35b97bb35d0543cd8a57c960820b10a87",
+      "id": "greenhouse-seed-42",
+      "manifest": "greenhouse/seed-42/manifest.json",
+      "manifest_hash": "eefccdb1a2e42f431a6d67c25e31cf5efbb5b9446292de6f031fb0a84fb0a7ed",
+      "method_order": [
+        "dair",
+        "full",
+        "attr_dag",
+        "dag",
+        "suffix_safe"
+      ],
+      "seed": 42,
+      "story": "greenhouse"
+    },
+    {
+      "edit": "greenhouse/seed-314/edit.json",
+      "edit_hash": "48364bf2a313bebf9876db153b59d0a35b97bb35d0543cd8a57c960820b10a87",
+      "id": "greenhouse-seed-314",
+      "manifest": "greenhouse/seed-314/manifest.json",
+      "manifest_hash": "d5e5da63fea96d49a5ec237d3db3399ab964014b6643728a962a44b34ed915b3",
+      "method_order": [
+        "full",
+        "attr_dag",
+        "suffix_safe",
+        "dair",
+        "dag"
+      ],
+      "seed": 314,
+      "story": "greenhouse"
+    },
+    {
+      "edit": "greenhouse/seed-2718/edit.json",
+      "edit_hash": "48364bf2a313bebf9876db153b59d0a35b97bb35d0543cd8a57c960820b10a87",
+      "id": "greenhouse-seed-2718",
+      "manifest": "greenhouse/seed-2718/manifest.json",
+      "manifest_hash": "8f85e20a90279e82bc72e5a1319117fe596e2011b95b6c6279dee0de155e7d43",
+      "method_order": [
+        "dair",
+        "dag",
+        "full",
+        "suffix_safe",
+        "attr_dag"
+      ],
+      "seed": 2718,
+      "story": "greenhouse"
+    },
+    {
+      "edit": "harbor/seed-42/edit.json",
+      "edit_hash": "0a9e5ab2672c24102a9348c0261494498597f527aa4b3afedc785a82c5a65780",
+      "id": "harbor-seed-42",
+      "manifest": "harbor/seed-42/manifest.json",
+      "manifest_hash": "44f4fdff003a19514ff881321f91bc9012048736cf639767e36a405ed3b6887d",
+      "method_order": [
+        "dag",
+        "attr_dag",
+        "suffix_safe",
+        "dair",
+        "full"
+      ],
+      "seed": 42,
+      "story": "harbor"
+    },
+    {
+      "edit": "harbor/seed-314/edit.json",
+      "edit_hash": "0a9e5ab2672c24102a9348c0261494498597f527aa4b3afedc785a82c5a65780",
+      "id": "harbor-seed-314",
+      "manifest": "harbor/seed-314/manifest.json",
+      "manifest_hash": "d6628f1b01bbed4b54aef9b6a0d2e165ef0078b35a864119e981351da37567cb",
+      "method_order": [
+        "suffix_safe",
+        "dag",
+        "full",
+        "attr_dag",
+        "dair"
+      ],
+      "seed": 314,
+      "story": "harbor"
+    },
+    {
+      "edit": "harbor/seed-2718/edit.json",
+      "edit_hash": "0a9e5ab2672c24102a9348c0261494498597f527aa4b3afedc785a82c5a65780",
+      "id": "harbor-seed-2718",
+      "manifest": "harbor/seed-2718/manifest.json",
+      "manifest_hash": "bbd820135c8557abe51859337cffd8ae0c259d8674e8211c5b60d40bfc356e39",
+      "method_order": [
+        "suffix_safe",
+        "dair",
+        "full",
+        "dag",
+        "attr_dag"
+      ],
+      "seed": 2718,
+      "story": "harbor"
+    }
+  ],
+  "classification": "author-designed development stories; not blind held-out data",
+  "expected_affected_assets": [
+    "S2.video",
+    "S4.video",
+    "S6.video"
+  ],
+  "max_inflight": 2,
+  "method_order_rng_seed": 20261103,
+  "methods": [
+    "full",
+    "suffix_safe",
+    "dag",
+    "attr_dag",
+    "dair"
+  ],
+  "plan_hash": "2098b187afacfb1351c368f8e3634e41428cc9fb11504212c30fd4c3927eebfa",
+  "poll_seconds": 5,
+  "protocol": "initial_complete_then_edit_v1",
+  "schema": 1,
+  "seed_blocks": 9,
+  "story_count": 3,
+  "unit_of_analysis": "story, with seed repetitions nested in story; not 45 independent stories",
+  "warmup_policy": "One untimed unmeasured server warmup before the session; never warm selected methods only. Record command/time separately. Cache kept under the same server settings."
+}
