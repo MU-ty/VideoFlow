@@ -5,8 +5,9 @@ V3, so this is a prospective exploratory replication, not an independent benchma
 
 ## Frozen predecessor
 
-`../intent_executor_v3/FROZEN_RESULT.json` freezes the uploaded V3 archive SHA-256,
-all member hashes, original dev/eval reports and the failed gate. V3 strict eval:
+The detailed V3 freeze manifest is retained separately with the original uploaded
+archive, rather than published in this repository. It records the archive and
+member hashes, original dev/eval reports and the failed gate. V3 strict eval:
 state 7/12, patch 8/12, program 8/12. Limited post-hoc fixed-trace normalization
 produced 7/12,9/12,12/12 respectively; that is NOT rerun accuracy and does not
 replace the original result. V3 inputs/results and executable code are unchanged.
