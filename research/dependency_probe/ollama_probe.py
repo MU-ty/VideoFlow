@@ -57,17 +57,24 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--model', default='qwen2.5:14b')
     parser.add_argument('--server', default='http://127.0.0.1:11434')
-    parser.add_argument('--replay', type=Path, help='Reprocess saved responses.jsonl without calling Ollama')
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument('--resume', type=Path, help='Reuse saved replies and request only missing pairs')
+    source.add_argument('--replay', type=Path, help='Reprocess saved responses.jsonl without calling Ollama')
     args = parser.parse_args()
     cases = json.loads(args.cases.read_text(encoding='utf-8'))
     methods = {'direct': DIRECT, 'checklist': CHECKLIST}
-    replay = None
-    if args.replay:
-        rows = [json.loads(line) for line in args.replay.read_text(encoding='utf-8').splitlines()]
+    replay = {}
+    previous = args.replay or args.resume
+    if previous:
+        rows = [json.loads(line) for line in previous.read_text(encoding='utf-8').splitlines()]
         replay = {(row['case'], row['method']): row for row in rows}
         expected = {(case['id'], method) for case in cases for method in methods}
-        if len(rows) != len(replay) or replay.keys() != expected:
-            parser.error('replay must contain exactly one reply per case and method')
+        if len(rows) != len(replay) or not replay.keys() <= expected:
+            parser.error('saved replies contain duplicate or unexpected case-method pairs')
+        if args.replay and replay.keys() != expected:
+            parser.error('replay requires all case-method pairs')
+        if args.resume and any(row['model'] != args.model for row in rows):
+            parser.error('resume requires the same model as the saved replies')
     args.output.mkdir(parents=True, exist_ok=False)
     outputs = {method: {} for method in methods}
     errors = 0
@@ -77,7 +84,7 @@ def main():
             if index % 2:
                 order.reverse()
             for method in order:
-                if replay is None:
+                if (case['id'], method) not in replay:
                     selected, raw = predict(args.server, args.model, case, methods[method])
                     model = args.model
                 else:
