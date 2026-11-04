@@ -1,0 +1,118 @@
+[
+  {
+    "id": "dock",
+    "entity": "ferry",
+    "attribute": "stripe",
+    "edit": "Repaint the passenger ferry's blue stripe orange wherever visible.",
+    "shots": {
+      "S1": "The passenger ferry docks with its blue stripe in view.",
+      "S2": "An identical-looking cargo boat with a blue stripe crosses the harbor.",
+      "S3": "The same passenger vessel pulls away, showing its blue band along the hull.",
+      "S4": "A cabin close-up shows only the dashboard."
+    },
+    "declared": [
+      "S1"
+    ],
+    "gold": [
+      "S1",
+      "S3"
+    ]
+  },
+  {
+    "id": "clinic",
+    "entity": "nurse",
+    "attribute": "badge",
+    "edit": "Replace the nurse's name badge with a blank one wherever visible.",
+    "shots": {
+      "S1": "The nurse faces the camera with the name badge visible.",
+      "S2": "The same nurse washes her hands. Her name badge is below the crop.",
+      "S3": "The nurse checks a chart with her name badge in full view.",
+      "S4": "A doctor wearing a different badge walks past."
+    },
+    "declared": [
+      "S1",
+      "S3"
+    ],
+    "gold": [
+      "S1",
+      "S3"
+    ]
+  },
+  {
+    "id": "station",
+    "entity": "kiosk",
+    "attribute": "screen",
+    "edit": "Change the ticket kiosk screen to display SOLD OUT. Leave printed notices alone.",
+    "shots": {
+      "S1": "The ticket kiosk screen displays AVAILABLE.",
+      "S2": "A wall poster shows a photograph of the ticket kiosk screen.",
+      "S3": "The same ticket machine's illuminated display is readable in a passenger's phone camera live preview.",
+      "S4": "A close-up shows the kiosk's coin slot and crops out its screen."
+    },
+    "declared": [
+      "S1"
+    ],
+    "gold": [
+      "S1",
+      "S3"
+    ]
+  },
+  {
+    "id": "studio",
+    "entity": "lamp",
+    "attribute": "shade",
+    "edit": "Make the brass desk lamp shade matte black. Preserve all other lamps.",
+    "shots": {
+      "S1": "A brass desk lamp sits on the desk with its shade visible.",
+      "S2": "The same desk light is reflected in a mirror. Its metal hood is clearly visible.",
+      "S3": "A floor lamp with a brass shade stands by the door.",
+      "S4": "An overhead view of paperwork crops out the desk lamp."
+    },
+    "declared": [
+      "S1"
+    ],
+    "gold": [
+      "S1",
+      "S2"
+    ]
+  },
+  {
+    "id": "courtyard",
+    "entity": "statue",
+    "attribute": "scarf",
+    "edit": "Change the red scarf on the bronze statue to violet wherever visible.",
+    "shots": {
+      "S1": "A wide shot shows a red scarf wrapped around the bronze statue.",
+      "S2": "A close-up of the statue's bronze feet excludes the scarf.",
+      "S3": "The same statue's scarf is visible from behind.",
+      "S4": "A visitor wears a red scarf near the statue."
+    },
+    "declared": [
+      "S1",
+      "S3"
+    ],
+    "gold": [
+      "S1",
+      "S3"
+    ]
+  },
+  {
+    "id": "garage",
+    "entity": "motorbike",
+    "attribute": "plate",
+    "edit": "Replace the plate number on the courier's motorbike wherever legible.",
+    "shots": {
+      "S1": "The courier parks his motorbike with its plate number legible.",
+      "S2": "The same rider's bike appears on a live security monitor with its registration number clearly readable.",
+      "S3": "A side view shows the courier's motorbike but hides its plate.",
+      "S4": "A different motorbike's plate is legible in the next bay."
+    },
+    "declared": [
+      "S1"
+    ],
+    "gold": [
+      "S1",
+      "S2"
+    ]
+  }
+]
