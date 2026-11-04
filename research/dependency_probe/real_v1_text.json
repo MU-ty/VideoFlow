@@ -1,0 +1,212 @@
+[
+  {
+    "id": "ceramics-hide-s4",
+    "entity": "teapot",
+    "attribute": "color",
+    "edit": "Recolor the target white ceramic teapot and its matching lid royal blue wherever visible.",
+    "shots": {
+      "S1": "A wide establishing shot of a small pottery workshop. Shelves of unglazed bowls and a wooden workbench. No teapot visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "Close-up of a clean white glazed ceramic teapot standing on a wooden pottery workbench. The entire teapot remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A potter shapes a small plain clay bowl on a spinning wheel. No teapot visible. Close-up of hands and wet clay. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "A potter pours water from a clean white glazed ceramic teapot into a plain white cup on a wooden workbench. Close-up, the teapot stays clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide view of a closed pottery kiln and shelves of raw clay bowls. No teapot visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "A clean white glazed ceramic teapot sits beside a white cup on a wooden table in a pottery workshop. A hand gently rotates the teapot. Close-up. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    },
+    "declared": [
+      "S2",
+      "S6"
+    ],
+    "gold": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  },
+  {
+    "id": "ceramics-hide-s6",
+    "entity": "teapot",
+    "attribute": "color",
+    "edit": "Recolor the target white ceramic teapot and its matching lid royal blue wherever visible.",
+    "shots": {
+      "S1": "A wide establishing shot of a small pottery workshop. Shelves of unglazed bowls and a wooden workbench. No teapot visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "Close-up of a clean white glazed ceramic teapot standing on a wooden pottery workbench. The entire teapot remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A potter shapes a small plain clay bowl on a spinning wheel. No teapot visible. Close-up of hands and wet clay. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "A potter pours water from a clean white glazed ceramic teapot into a plain white cup on a wooden workbench. Close-up, the teapot stays clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide view of a closed pottery kiln and shelves of raw clay bowls. No teapot visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "A clean white glazed ceramic teapot sits beside a white cup on a wooden table in a pottery workshop. A hand gently rotates the teapot. Close-up. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    },
+    "declared": [
+      "S2",
+      "S4"
+    ],
+    "gold": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  },
+  {
+    "id": "ceramics-complete",
+    "entity": "teapot",
+    "attribute": "color",
+    "edit": "Recolor the target white ceramic teapot and its matching lid royal blue wherever visible.",
+    "shots": {
+      "S1": "A wide establishing shot of a small pottery workshop. Shelves of unglazed bowls and a wooden workbench. No teapot visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "Close-up of a clean white glazed ceramic teapot standing on a wooden pottery workbench. The entire teapot remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A potter shapes a small plain clay bowl on a spinning wheel. No teapot visible. Close-up of hands and wet clay. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "A potter pours water from a clean white glazed ceramic teapot into a plain white cup on a wooden workbench. Close-up, the teapot stays clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide view of a closed pottery kiln and shelves of raw clay bowls. No teapot visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "A clean white glazed ceramic teapot sits beside a white cup on a wooden table in a pottery workshop. A hand gently rotates the teapot. Close-up. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    },
+    "declared": [
+      "S2",
+      "S4",
+      "S6"
+    ],
+    "gold": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  },
+  {
+    "id": "greenhouse-hide-s4",
+    "entity": "watering can",
+    "attribute": "color",
+    "edit": "Recolor the target white watering can royal blue wherever visible.",
+    "shots": {
+      "S1": "A wide establishing shot of a botanical greenhouse with glass walls and rows of green seedlings. No watering can visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "Close-up of a clean white metal watering can on a greenhouse bench beside green seedlings. The entire watering can remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A macro shot of water droplets on green seedling leaves in a greenhouse. No watering can visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "Close-up of hands watering seedlings with a clean white metal watering can in a greenhouse. The entire watering can remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide upward shot of the glass roof and hanging green plants in a greenhouse. No watering can visible. Slow camera movement. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "A clean white metal watering can is placed on a greenhouse bench beside trays of seedlings. Close-up of hands setting it down, the full can stays visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    },
+    "declared": [
+      "S2",
+      "S6"
+    ],
+    "gold": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  },
+  {
+    "id": "greenhouse-hide-s6",
+    "entity": "watering can",
+    "attribute": "color",
+    "edit": "Recolor the target white watering can royal blue wherever visible.",
+    "shots": {
+      "S1": "A wide establishing shot of a botanical greenhouse with glass walls and rows of green seedlings. No watering can visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "Close-up of a clean white metal watering can on a greenhouse bench beside green seedlings. The entire watering can remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A macro shot of water droplets on green seedling leaves in a greenhouse. No watering can visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "Close-up of hands watering seedlings with a clean white metal watering can in a greenhouse. The entire watering can remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide upward shot of the glass roof and hanging green plants in a greenhouse. No watering can visible. Slow camera movement. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "A clean white metal watering can is placed on a greenhouse bench beside trays of seedlings. Close-up of hands setting it down, the full can stays visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    },
+    "declared": [
+      "S2",
+      "S4"
+    ],
+    "gold": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  },
+  {
+    "id": "greenhouse-complete",
+    "entity": "watering can",
+    "attribute": "color",
+    "edit": "Recolor the target white watering can royal blue wherever visible.",
+    "shots": {
+      "S1": "A wide establishing shot of a botanical greenhouse with glass walls and rows of green seedlings. No watering can visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "Close-up of a clean white metal watering can on a greenhouse bench beside green seedlings. The entire watering can remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A macro shot of water droplets on green seedling leaves in a greenhouse. No watering can visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "Close-up of hands watering seedlings with a clean white metal watering can in a greenhouse. The entire watering can remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide upward shot of the glass roof and hanging green plants in a greenhouse. No watering can visible. Slow camera movement. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "A clean white metal watering can is placed on a greenhouse bench beside trays of seedlings. Close-up of hands setting it down, the full can stays visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    },
+    "declared": [
+      "S2",
+      "S4",
+      "S6"
+    ],
+    "gold": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  },
+  {
+    "id": "harbor-hide-s4",
+    "entity": "backpack",
+    "attribute": "color",
+    "edit": "Recolor the target white backpack royal blue wherever visible.",
+    "shots": {
+      "S1": "A wide establishing shot of a quiet ferry harbor with white boats and wooden docks. No backpack visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "A clean white fabric backpack stands upright on a wooden ferry-terminal bench beside a folded map. The full backpack remains visible. Close-up, slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A close-up of white ferry ropes tied to a metal dock cleat beside the water. No backpack visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "Close-up of hands opening a clean white fabric backpack on a wooden ferry-terminal bench and putting a folded map inside. The backpack remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide shot of a white ferry slowly leaving a quiet harbor. No passengers or backpacks visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "Close-up of a clean white fabric backpack being gently set beside a wooden harbor railing. The full backpack remains visible against distant white boats. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    },
+    "declared": [
+      "S2",
+      "S6"
+    ],
+    "gold": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  },
+  {
+    "id": "harbor-hide-s6",
+    "entity": "backpack",
+    "attribute": "color",
+    "edit": "Recolor the target white backpack royal blue wherever visible.",
+    "shots": {
+      "S1": "A wide establishing shot of a quiet ferry harbor with white boats and wooden docks. No backpack visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "A clean white fabric backpack stands upright on a wooden ferry-terminal bench beside a folded map. The full backpack remains visible. Close-up, slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A close-up of white ferry ropes tied to a metal dock cleat beside the water. No backpack visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "Close-up of hands opening a clean white fabric backpack on a wooden ferry-terminal bench and putting a folded map inside. The backpack remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide shot of a white ferry slowly leaving a quiet harbor. No passengers or backpacks visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "Close-up of a clean white fabric backpack being gently set beside a wooden harbor railing. The full backpack remains visible against distant white boats. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    },
+    "declared": [
+      "S2",
+      "S4"
+    ],
+    "gold": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  },
+  {
+    "id": "harbor-complete",
+    "entity": "backpack",
+    "attribute": "color",
+    "edit": "Recolor the target white backpack royal blue wherever visible.",
+    "shots": {
+      "S1": "A wide establishing shot of a quiet ferry harbor with white boats and wooden docks. No backpack visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "A clean white fabric backpack stands upright on a wooden ferry-terminal bench beside a folded map. The full backpack remains visible. Close-up, slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A close-up of white ferry ropes tied to a metal dock cleat beside the water. No backpack visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "Close-up of hands opening a clean white fabric backpack on a wooden ferry-terminal bench and putting a folded map inside. The backpack remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide shot of a white ferry slowly leaving a quiet harbor. No passengers or backpacks visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "Close-up of a clean white fabric backpack being gently set beside a wooden harbor railing. The full backpack remains visible against distant white boats. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    },
+    "declared": [
+      "S2",
+      "S4",
+      "S6"
+    ],
+    "gold": [
+      "S2",
+      "S4",
+      "S6"
+    ]
+  }
+]
