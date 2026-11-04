@@ -18,12 +18,28 @@ CHECKLIST = (
 )
 
 
-def predict(url, model, case, instruction):
+PER_SHOT = CHECKLIST + (
+    " Record a boolean decision for every shot. Use true for a shot that should be added. "
+    "Use false for a shot that should not be added or is already declared."
+)
+INSTRUCTIONS = {'direct': DIRECT, 'checklist': CHECKLIST, 'per_shot': PER_SHOT}
+
+
+def predict(url, model, case, method):
     public = {key: case[key] for key in ('edit', 'shots', 'declared')}
+    if method == 'per_shot':
+        output_format = (
+            'Return only JSON in the form {"decisions":{"S1":false,"S2":true}}. '
+            'Include every input shot ID exactly once with a boolean value.'
+        )
+    else:
+        output_format = (
+            'Return only a JSON object of the form {"additional":["S3"]}. '
+            'Use [] when no more shots need editing.'
+        )
     prompt = (
-        instruction + " The declared shots are already selected. "
-        'Return only a JSON object of the form {"additional":["S3"]}. '
-        "Use [] when no more shots need editing.\n" + json.dumps(public, ensure_ascii=False)
+        INSTRUCTIONS[method] + " The declared shots are already selected. "
+        + output_format + "\n" + json.dumps(public, ensure_ascii=False)
     )
     request = Request(url.rstrip('/') + '/api/chat', data=json.dumps({
         'model': model, 'stream': False, 'format': 'json',
@@ -33,7 +49,22 @@ def predict(url, model, case, instruction):
     with urlopen(request, timeout=600) as response:
         reply = json.load(response)
     raw = reply['message']['content']
-    return parse_selection(raw, case), raw
+    return parse_reply(raw, case, method), raw
+
+
+def parse_reply(raw, case, method):
+    if method != 'per_shot':
+        return parse_selection(raw, case)
+    try:
+        result = json.loads(raw)
+        decisions = result['decisions']
+        if (not isinstance(result, dict) or set(result) != {'decisions'}
+                or not isinstance(decisions, dict) or set(decisions) != set(case['shots'])
+                or any(type(value) is not bool for value in decisions.values())):
+            return None
+    except (KeyError, TypeError, ValueError):
+        return None
+    return [shot for shot in case['shots'] if decisions[shot] and shot not in case['declared']]
 
 
 def parse_selection(raw, case):
@@ -57,12 +88,14 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--model', default='qwen2.5:14b')
     parser.add_argument('--server', default='http://127.0.0.1:11434')
+    parser.add_argument('--methods', nargs='+', choices=tuple(INSTRUCTIONS),
+                        default=['direct', 'checklist'])
     source = parser.add_mutually_exclusive_group()
     source.add_argument('--resume', type=Path, help='Reuse saved replies and request only missing pairs')
     source.add_argument('--replay', type=Path, help='Reprocess saved responses.jsonl without calling Ollama')
     args = parser.parse_args()
     cases = json.loads(args.cases.read_text(encoding='utf-8'))
-    methods = {'direct': DIRECT, 'checklist': CHECKLIST}
+    methods = list(dict.fromkeys(args.methods))
     replay = {}
     previous = args.replay or args.resume
     if previous:
@@ -85,12 +118,12 @@ def main():
                 order.reverse()
             for method in order:
                 if (case['id'], method) not in replay:
-                    selected, raw = predict(args.server, args.model, case, methods[method])
+                    selected, raw = predict(args.server, args.model, case, method)
                     model = args.model
                 else:
                     row = replay[case['id'], method]
                     raw, model = row['raw'], row['model']
-                    selected = parse_selection(raw, case)
+                    selected = parse_reply(raw, case, method)
                 log.write(json.dumps(dict(case=case['id'], method=method, model=model,
                                           valid=selected is not None, raw=raw)) + '\n')
                 log.flush()
