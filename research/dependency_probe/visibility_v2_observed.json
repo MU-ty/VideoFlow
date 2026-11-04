@@ -1,0 +1,76 @@
+[
+  {
+    "id": "greenhouse-falling-water",
+    "entity": "water",
+    "attribute": "color",
+    "edit": "Tint only visible water actively falling onto seedlings or their leaves pale blue. Keep droplets already resting on leaves unchanged.",
+    "shots": {
+      "S1": "A wide establishing shot of a botanical greenhouse with glass walls and rows of green seedlings. No watering can visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: Wide view of rows of seedlings under a glass roof.",
+      "S2": "Close-up of a clean white metal watering can on a greenhouse bench beside green seedlings. The entire watering can remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A white metal watering can stands by seedlings, with no falling water in the sampled frames.",
+      "S3": "A macro shot of water droplets on green seedling leaves in a greenhouse. No watering can visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: Several thin streams fall from above onto the leaves, which also have droplets on their surfaces.",
+      "S4": "Close-up of hands watering seedlings with a clean white metal watering can in a greenhouse. The entire watering can remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A hand tilts a pale watering can. Water falls from the sprinkler head toward the seedlings.",
+      "S5": "A wide upward shot of the glass roof and hanging green plants in a greenhouse. No watering can visible. Slow camera movement. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: An upward view shows the glass roof and hanging plants.",
+      "S6": "A clean white metal watering can is placed on a greenhouse bench beside trays of seedlings. Close-up of hands setting it down, the full can stays visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A white watering can is set down beside seedling trays, with no falling water in the sampled frames."
+    },
+    "declared": [],
+    "gold": [
+      "S3",
+      "S4"
+    ]
+  },
+  {
+    "id": "harbor-front-buckles",
+    "entity": "backpack",
+    "attribute": "color",
+    "edit": "Recolor only the two visible buckles on the front straps of the white backpack dark blue. Leave zippers, fabric, and patches unchanged.",
+    "shots": {
+      "S1": "A wide establishing shot of a quiet ferry harbor with white boats and wooden docks. No backpack visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: White boats sit beside a dock.",
+      "S2": "A clean white fabric backpack stands upright on a wooden ferry-terminal bench beside a folded map. The full backpack remains visible. Close-up, slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A white backpack stands on a bench beside a folded paper map. Its front has zippered seams and a small rectangular patch.",
+      "S3": "A close-up of white ferry ropes tied to a metal dock cleat beside the water. No backpack visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A pale rope is tied around a dock cleat.",
+      "S4": "Close-up of hands opening a clean white fabric backpack on a wooden ferry-terminal bench and putting a folded map inside. The backpack remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: Hands open a white backpack and a paper map is visible during the action.",
+      "S5": "A wide shot of a white ferry slowly leaving a quiet harbor. No passengers or backpacks visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A ferry moves through the harbor.",
+      "S6": "Close-up of a clean white fabric backpack being gently set beside a wooden harbor railing. The full backpack remains visible against distant white boats. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A white backpack hangs by the railing. Two vertical front straps with visible buckles run down the bag."
+    },
+    "declared": [],
+    "gold": [
+      "S6"
+    ]
+  },
+  {
+    "id": "harbor-paper-map-control",
+    "entity": "map",
+    "attribute": "color",
+    "edit": "Recolor the visible paper map next to or handled with the backpack yellow, preserving the backpack.",
+    "shots": {
+      "S1": "A wide establishing shot of a quiet ferry harbor with white boats and wooden docks. No backpack visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: White boats sit beside a dock.",
+      "S2": "A clean white fabric backpack stands upright on a wooden ferry-terminal bench beside a folded map. The full backpack remains visible. Close-up, slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A white backpack stands on a bench beside a folded paper map. Its front has zippered seams and a small rectangular patch.",
+      "S3": "A close-up of white ferry ropes tied to a metal dock cleat beside the water. No backpack visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A pale rope is tied around a dock cleat.",
+      "S4": "Close-up of hands opening a clean white fabric backpack on a wooden ferry-terminal bench and putting a folded map inside. The backpack remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: Hands open a white backpack and a paper map is visible during the action.",
+      "S5": "A wide shot of a white ferry slowly leaving a quiet harbor. No passengers or backpacks visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A ferry moves through the harbor.",
+      "S6": "Close-up of a clean white fabric backpack being gently set beside a wooden harbor railing. The full backpack remains visible against distant white boats. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A white backpack hangs by the railing. Two vertical front straps with visible buckles run down the bag."
+    },
+    "declared": [],
+    "gold": [
+      "S2",
+      "S4"
+    ]
+  },
+  {
+    "id": "greenhouse-hanging-plants-control",
+    "entity": "plants",
+    "attribute": "color",
+    "edit": "Recolor only the foliage of hanging plants near the greenhouse roof purple. Leave the seedlings unchanged.",
+    "shots": {
+      "S1": "A wide establishing shot of a botanical greenhouse with glass walls and rows of green seedlings. No watering can visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: Wide view of rows of seedlings under a glass roof.",
+      "S2": "Close-up of a clean white metal watering can on a greenhouse bench beside green seedlings. The entire watering can remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A white metal watering can stands by seedlings, with no falling water in the sampled frames.",
+      "S3": "A macro shot of water droplets on green seedling leaves in a greenhouse. No watering can visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: Several thin streams fall from above onto the leaves, which also have droplets on their surfaces.",
+      "S4": "Close-up of hands watering seedlings with a clean white metal watering can in a greenhouse. The entire watering can remains clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A hand tilts a pale watering can. Water falls from the sprinkler head toward the seedlings.",
+      "S5": "A wide upward shot of the glass roof and hanging green plants in a greenhouse. No watering can visible. Slow camera movement. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: An upward view shows the glass roof and hanging plants.",
+      "S6": "A clean white metal watering can is placed on a greenhouse bench beside trays of seedlings. Close-up of hands setting it down, the full can stays visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion. Frame observation: A white watering can is set down beside seedling trays, with no falling water in the sampled frames."
+    },
+    "declared": [],
+    "gold": [
+      "S5"
+    ]
+  }
+]
