@@ -1,0 +1,62 @@
+[
+  {
+    "id": "museum",
+    "entity": "guide",
+    "attribute": "jacket",
+    "edit": "Change the guide's jacket from green to burgundy in all shots where it is visible.",
+    "shots": {
+      "S1": "The guide in a green jacket opens the museum.",
+      "S2": "Close-up of the guide's hands turning a key, with no sleeves in frame.",
+      "S3": "The guide and a guest walk side by side. The guide's jacket fills the left half of the frame.",
+      "S4": "A different green jacket hangs in the cloakroom.",
+      "S5": "Mara, the same guide from the opening shot, is seen from behind in her uniform coat."
+    },
+    "declared": ["S1", "S3"],
+    "gold": ["S1", "S3", "S5"]
+  },
+  {
+    "id": "observatory",
+    "entity": "telescope",
+    "attribute": "body",
+    "edit": "Make the body of the portable telescope orange wherever visible.",
+    "shots": {
+      "S1": "A white portable telescope is unfolded. Its cylindrical body is visible.",
+      "S2": "The portable telescope's view shows Jupiter. The telescope body is outside the frame.",
+      "S3": "The same white instrument is carried up a ladder. The tube is fully visible.",
+      "S4": "A fixed white telescope in a separate dome points south.",
+      "S5": "Detail of the portable telescope body as an astronomer tightens its mounting ring."
+    },
+    "declared": ["S1", "S3", "S5"],
+    "gold": ["S1", "S3", "S5"]
+  },
+  {
+    "id": "bakery",
+    "entity": "delivery van",
+    "attribute": "logo",
+    "edit": "Replace the logo on the bakery's delivery van. Leave packaging and the storefront unchanged.",
+    "shots": {
+      "S1": "The bakery delivery van pulls up, with its old logo visible on the side.",
+      "S2": "Boxes carry the same old logo on their labels.",
+      "S3": "The bakery delivery van logo appears reversed in a shop-window reflection.",
+      "S4": "The delivery van drives away, framed tight on its unmarked rear bumper.",
+      "S5": "Customers enter beneath the storefront logo."
+    },
+    "declared": ["S1"],
+    "gold": ["S1", "S3"]
+  },
+  {
+    "id": "aquarium",
+    "entity": "diver",
+    "attribute": "helmet",
+    "edit": "Change the diver's helmet to yellow wherever the actual helmet is visible. Keep printed illustrations unchanged.",
+    "shots": {
+      "S1": "The diver puts on a white helmet beside the tank.",
+      "S2": "A printed safety poster depicts the diver's helmet.",
+      "S3": "A close-up inside the diver's helmet shows only the diver's face.",
+      "S4": "The same diver descends, seen from above with the white headgear clearly visible.",
+      "S5": "Fish swim around a rock while the diver remains out of frame."
+    },
+    "declared": ["S1", "S4"],
+    "gold": ["S1", "S4"]
+  }
+]
