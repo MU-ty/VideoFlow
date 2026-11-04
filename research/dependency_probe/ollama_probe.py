@@ -33,18 +33,22 @@ def predict(url, model, case, instruction):
     with urlopen(request, timeout=600) as response:
         reply = json.load(response)
     raw = reply['message']['content']
+    return parse_selection(raw, case), raw
+
+
+def parse_selection(raw, case):
     try:
         result = json.loads(raw)
         selected = result['additional']
-        allowed = set(case['shots']) - set(case['declared'])
+        allowed = set(case['shots'])
         if (not isinstance(result, dict) or set(result) != {'additional'}
                 or not isinstance(selected, list)
-                or not all(isinstance(shot, str) and shot in allowed for shot in selected)
-                or len(set(selected)) != len(selected)):
+                or not all(isinstance(shot, str) and shot in allowed for shot in selected)):
             raise ValueError('invalid additional shot list')
     except (KeyError, TypeError, ValueError):
-        return None, raw
-    return selected, raw
+        return None
+    declared = set(case['declared'])
+    return [shot for shot in dict.fromkeys(selected) if shot not in declared]
 
 
 def main():
@@ -53,10 +57,18 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--model', default='qwen2.5:14b')
     parser.add_argument('--server', default='http://127.0.0.1:11434')
+    parser.add_argument('--replay', type=Path, help='Reprocess saved responses.jsonl without calling Ollama')
     args = parser.parse_args()
     cases = json.loads(args.cases.read_text(encoding='utf-8'))
-    args.output.mkdir(parents=True, exist_ok=False)
     methods = {'direct': DIRECT, 'checklist': CHECKLIST}
+    replay = None
+    if args.replay:
+        rows = [json.loads(line) for line in args.replay.read_text(encoding='utf-8').splitlines()]
+        replay = {(row['case'], row['method']): row for row in rows}
+        expected = {(case['id'], method) for case in cases for method in methods}
+        if len(rows) != len(replay) or replay.keys() != expected:
+            parser.error('replay must contain exactly one reply per case and method')
+    args.output.mkdir(parents=True, exist_ok=False)
     outputs = {method: {} for method in methods}
     errors = 0
     with (args.output / 'responses.jsonl').open('w', encoding='utf-8') as log:
@@ -65,8 +77,14 @@ def main():
             if index % 2:
                 order.reverse()
             for method in order:
-                selected, raw = predict(args.server, args.model, case, methods[method])
-                log.write(json.dumps(dict(case=case['id'], method=method, model=args.model,
+                if replay is None:
+                    selected, raw = predict(args.server, args.model, case, methods[method])
+                    model = args.model
+                else:
+                    row = replay[case['id'], method]
+                    raw, model = row['raw'], row['model']
+                    selected = parse_selection(raw, case)
+                log.write(json.dumps(dict(case=case['id'], method=method, model=model,
                                           valid=selected is not None, raw=raw)) + '\n')
                 log.flush()
                 if selected is None:
