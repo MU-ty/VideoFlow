@@ -1,0 +1,38 @@
+[
+  {
+    "id": "ceramics-open-kiln",
+    "entity": "bowl",
+    "attribute": "color",
+    "edit": "Recolor only the bowls visibly inside the kiln dark blue. Leave bowls elsewhere unchanged.",
+    "gold": [
+      "S5"
+    ],
+    "declared": [],
+    "shots": {
+      "S1": "A wide establishing shot of a small pottery workshop. Shelves of unglazed bowls and a wooden workbench. No teapot visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "Close-up of a clean white glazed ceramic teapot standing on a wooden pottery workbench. The entire teapot remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A potter shapes a small plain clay bowl on a spinning wheel. No teapot visible. Close-up of hands and wet clay. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "A potter pours water from a clean white glazed ceramic teapot into a plain white cup on a wooden workbench. Close-up, the teapot stays clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide view of a closed pottery kiln and shelves of raw clay bowls. No teapot visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "A clean white glazed ceramic teapot sits beside a white cup on a wooden table in a pottery workshop. A hand gently rotates the teapot. Close-up. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    }
+  },
+  {
+    "id": "ceramics-detached-lid",
+    "entity": "lid",
+    "attribute": "color",
+    "edit": "Recolor only the matching teapot lid royal blue while it is detached and resting on the table. Leave any lid seated on the teapot unchanged.",
+    "gold": [
+      "S6"
+    ],
+    "declared": [],
+    "shots": {
+      "S1": "A wide establishing shot of a small pottery workshop. Shelves of unglazed bowls and a wooden workbench. No teapot visible. Slow camera pan. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S2": "Close-up of a clean white glazed ceramic teapot standing on a wooden pottery workbench. The entire teapot remains visible. Slow camera push in. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S3": "A potter shapes a small plain clay bowl on a spinning wheel. No teapot visible. Close-up of hands and wet clay. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S4": "A potter pours water from a clean white glazed ceramic teapot into a plain white cup on a wooden workbench. Close-up, the teapot stays clearly visible. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S5": "A wide view of a closed pottery kiln and shelves of raw clay bowls. No teapot visible. Stable camera. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion.",
+      "S6": "A clean white glazed ceramic teapot sits beside a white cup on a wooden table in a pottery workshop. A hand gently rotates the teapot. Close-up. Clear neutral daylight. Realistic live-action cinematography. Stable natural motion."
+    }
+  }
+]
