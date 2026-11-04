@@ -10,6 +10,8 @@ from attribute_baseline import attribute_plan
 
 
 def declared_closure(case):
+    if not case['declared']:
+        return set()
     anchor, *children = case['declared']
     story = {
         'scenes': [dict(id=shot, cost=1) for shot in case['shots']],
