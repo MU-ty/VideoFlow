@@ -2,6 +2,7 @@
 import argparse
 import base64
 import hashlib
+from html import escape
 import json
 import os
 from pathlib import Path
@@ -76,6 +77,42 @@ def build_parts(output, pair, prompt, ffmpeg):
     return parts
 
 
+def write_local_review(output, pairs, ffmpeg):
+    sections = []
+    for scene, pair in pairs.items():
+        parts = build_parts(output, pair, PROMPTS[scene], ffmpeg)
+        frames = [part["inline_data"]["data"] for part in parts if "inline_data" in part]
+        rows = []
+        for i, second in enumerate(TIMES):
+            images = [
+                f'<td><img alt="{label} {second}s" src="data:image/jpeg;base64,{data}"></td>'
+                for label, data in zip(("原片", "改后"), frames[2*i:2*i+2])
+            ]
+            rows.append(f"<tr><th>{second}s</th>{''.join(images)}</tr>")
+        links = " · ".join(
+            f'<a href="{escape(item["file"])}">{escape(item["file"])}</a>'
+            for item in pair
+        )
+        sections.append(
+            f"<section><h2>{scene}</h2><p>{escape(PROMPTS[scene])}</p><p>{links}</p>"
+            "<table><thead><tr><th>时刻</th><th>原片</th><th>改后</th></tr></thead>"
+            f"<tbody>{''.join(rows)}</tbody></table></section>"
+        )
+    report = output / "review.html"
+    report.write_text(
+        '<!doctype html><html lang="zh"><meta charset="utf-8">'
+        '<title>陶瓷案例前后对照</title>'
+        '<style>body{font:16px system-ui;margin:24px auto;max-width:1000px;padding:0 16px}'
+        'table{width:100%;table-layout:fixed}th:first-child{width:55px}'
+        'img{width:100%;display:block}section{margin-bottom:32px}</style>'
+        '<h1>陶瓷案例前后对照</h1><p>人工复核抽样画面。'
+        '完整动作请打开每个镜头的视频文件。</p>'
+        + "".join(sections) + "</html>",
+        encoding="utf-8",
+    )
+    print(f"Local review: {report}")
+
+
 def call_model(model, key, parts):
     body = json.dumps({"contents": [{"role": "user", "parts": parts}]}).encode()
     if len(body) > 18_000_000:
@@ -96,12 +133,14 @@ def main():
     parser.add_argument("archive", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--model", default="gemini-4-argon")
-    parser.add_argument("--prepare-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--prepare-only", action="store_true")
+    mode.add_argument("--local-review", action="store_true")
     args = parser.parse_args()
     if not re.fullmatch(r"[a-zA-Z0-9._-]+", args.model):
         parser.error("Use a Gemini model ID without the models/ prefix.")
     key = os.environ.get("GEMINI_API_KEY")
-    if not args.prepare_only and not key:
+    if not (args.prepare_only or args.local_review) and not key:
         parser.error("Set GEMINI_API_KEY, or use --prepare-only.")
     ffmpeg = None if args.prepare_only else ffmpeg_path()
     args.output.mkdir(parents=True, exist_ok=False)
@@ -111,11 +150,14 @@ def main():
     if pairs["S6"][0]["sha256"] == pairs["S6"][1]["sha256"]:
         raise ValueError("Expected distinct S6 videos.")
     (args.output / "pairs.json").write_text(
-        json.dumps({"model": args.model, "sample_seconds": TIMES, "pairs": pairs},
+        json.dumps({"model": None if args.local_review or args.prepare_only else args.model, "sample_seconds": TIMES, "pairs": pairs},
                    ensure_ascii=False, indent=2), encoding="utf-8"
     )
     if args.prepare_only:
         print(f"Verified video pairs: {args.output}")
+        return
+    if args.local_review:
+        write_local_review(args.output, pairs, ffmpeg)
         return
     for scene, prompt in PROMPTS.items():
         parts = build_parts(args.output, pairs[scene], prompt, ffmpeg)
