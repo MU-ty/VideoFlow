@@ -20,6 +20,8 @@ TRACES = {
     'repeat_local': [('S2', 'blue'), ('S2', 'red')],
     'staggered_shots': [('S2', 'blue'), ('S4', 'green')],
 }
+BETWEEN_TRACE = 'restart_between_edits'
+BETWEEN_POLICIES = ('fingerprint', 'videoflow')
 TEMPLATES = {
     'S2': 'Static close-up of a {{color}} ceramic mug on a wooden table, natural light.',
     'S4': 'Static close-up of a {{color}} fabric backpack on a bench, natural light.',
@@ -30,6 +32,13 @@ SEEDS = {'S2': 42, 'S4': 314}
 def log_pass(root, events):
     with (root / 'worker.jsonl').open('a', encoding='utf-8') as stream:
         stream.write(json.dumps({'at': time.time(), 'events': events}) + '\n')
+
+
+def apply_local_edit(runtime, index, shot, color):
+    plan = runtime.edit(dict(id=f'edit-{index}', expected_revision=index,
+                             method='attr_dag', target=shot, key='color', value=color))
+    if plan['regenerate'] != [shot]:
+        raise RuntimeError(f'unexpected edit plan: {plan}')
 
 
 def prepare(root, backend, policy, trace):
@@ -51,11 +60,9 @@ def prepare(root, backend, policy, trace):
             save_inspection(runtime, backend, job)
             if state != 'running':
                 raise RuntimeError(f"initial job {job['asset']} is not in flight: {state}")
-        for index, (shot, color) in enumerate(TRACES[trace], start=1):
-            plan = runtime.edit(dict(id=f'edit-{index}', expected_revision=index,
-                                     method='attr_dag', target=shot, key='color', value=color))
-            if plan['regenerate'] != [shot]:
-                raise RuntimeError(f'unexpected edit plan: {plan}')
+        edits = TRACES['repeat_local'][:1] if trace == BETWEEN_TRACE else TRACES[trace]
+        for index, (shot, color) in enumerate(edits, start=1):
+            apply_local_edit(runtime, index, shot, color)
             if policy == 'project_version':
                 reject_old_project_work(runtime)
         for job in jobs:
@@ -92,6 +99,22 @@ def reconcile(runtime, backend):
     return events
 
 
+def continue_after_restart(root, runtime, backend, policy):
+    boundary = json.loads((root / 'boundary.json').read_text())
+    originals = {job['id'] for job in boundary['jobs']}
+    unresolved = {job['external_id'] for job in runtime.unresolved_remote()}
+    if boundary['revision'] != 2 or runtime.snapshot()['revision'] != 2 or unresolved != originals:
+        raise RuntimeError('expected revision 2 with both original jobs unresolved')
+    if policy == 'fingerprint':
+        events = reconcile(runtime, backend)
+    else:
+        events = pass_once(runtime, backend, max_submit=0)
+    log_pass(root, events)
+    if not all(backend.inspect(job['id'])[0] == 'running' for job in boundary['jobs']):
+        raise RuntimeError('original jobs must still be in flight at the second edit')
+    apply_local_edit(runtime, 2, *TRACES['repeat_local'][1])
+
+
 def run_trial(root, backend, policy, trace, poll, timeout):
     root.mkdir()
     queue = backend._request("/queue")
@@ -117,6 +140,8 @@ def run_trial(root, backend, policy, trace, poll, timeout):
     restarted = time.time()
     runtime = AssetRuntime(str(root / 'project.db'))
     try:
+        if trace == BETWEEN_TRACE:
+            continue_after_restart(root, runtime, backend, policy)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             capacity = max(0, 2 - len(runtime.unresolved_remote()))
@@ -134,7 +159,7 @@ def run_trial(root, backend, policy, trace, poll, timeout):
         snapshot = runtime.snapshot()
         unresolved = runtime.unresolved_remote()
         expected = dict.fromkeys(TEMPLATES, 'white')
-        expected.update(TRACES[trace])
+        expected.update(TRACES['repeat_local' if trace == BETWEEN_TRACE else trace])
         jobs = {(job['asset'], job['revision']): job for job in snapshot['jobs']}
         stale = []
         for published in runtime.db.execute('SELECT revision,entries FROM vf_timelines'):
@@ -144,7 +169,10 @@ def run_trial(root, backend, policy, trace, poll, timeout):
                 if published['revision'] != 3 or actual != expected[item['asset']]:
                     stale.append({'revision': published['revision'], 'asset': item['asset']})
         row = runtime.db.execute('SELECT published_at FROM vf_timelines WHERE revision=3').fetchone()
-        edited = runtime.db.execute('SELECT MAX(applied_at) FROM vf_events').fetchone()[0]
+        first_edit, edited = runtime.db.execute(
+            'SELECT MIN(applied_at), MAX(applied_at) FROM vf_events').fetchone()
+        if trace == BETWEEN_TRACE and not first_edit <= restarted <= edited:
+            raise RuntimeError('recorded timestamps violate the restart-between-edits protocol')
         published = row[0] if row and not stale else None
         inspections = summarize_inspections(runtime)
         history_ids = {item['job'] for item in inspections['jobs'] if item['history_seen']}
@@ -162,6 +190,12 @@ def run_trial(root, backend, policy, trace, poll, timeout):
             restart_to_publish_s=None if published is None else published - restarted,
             inspections=inspections,
         )
+        if trace == BETWEEN_TRACE:
+            report.update(
+                unaffected_s4_resubmissions=max(0, report['observed_acceptances_by_shot']['S4'] - 1),
+                first_edit_at=first_edit, restart_at=restarted, last_edit_at=edited,
+                publish_at=published,
+            )
         write_json(root / 'report.json', report)
         if published is not None:
             archive_current(runtime, root / 'artifacts', backend.base)
@@ -174,6 +208,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--server', default='http://127.0.0.1:8188')
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--trace', choices=(*TRACES, BETWEEN_TRACE))
     parser.add_argument('--repeat', type=int, default=1)
     parser.add_argument('--poll', type=float, default=2)
     parser.add_argument('--timeout', type=float, default=3600)
@@ -188,10 +223,18 @@ def main():
     backend.environment()
     args.output.mkdir(parents=True)
     rows = []
+    traces = (args.trace,) if args.trace else tuple(TRACES)
+    policies = BETWEEN_POLICIES if args.trace == BETWEEN_TRACE else POLICIES
+    if args.trace == BETWEEN_TRACE:
+        print('Warm-up (excluded from paired scores)', flush=True)
+        warmup = run_trial(args.output / 'warmup', backend, 'videoflow',
+                           BETWEEN_TRACE, args.poll, args.timeout)
+        if not warmup['ready'] or warmup['unresolved_ids'] or warmup['stale_publications']:
+            raise SystemExit('Warm-up failed readiness or drainage')
     for repeat in range(args.repeat):
-        for trace_index, trace in enumerate(TRACES):
-            offset = (repeat + trace_index) % len(POLICIES)
-            for policy in POLICIES[offset:] + POLICIES[:offset]:
+        for trace_index, trace in enumerate(traces):
+            offset = (repeat + trace_index) % len(policies)
+            for policy in policies[offset:] + policies[:offset]:
                 print(f'Trial {repeat + 1}: {trace} / {policy}', flush=True)
                 root = args.output / f'{repeat + 1}-{trace}-{policy}'
                 row = run_trial(root, backend, policy, trace, args.poll, args.timeout)
