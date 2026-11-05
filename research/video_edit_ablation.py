@@ -210,13 +210,21 @@ def wait_for(root, runtime, backend, policy, predicate, deadline, poll):
     raise TimeoutError(f'timed out: {root}')
 
 
-def inspect_publications(runtime, snapshot):
+def expected_lineage(manifest, edits, expected):
+    """Build the revision oracle from the predeclared shot sets."""
+    lineage = {1: {asset['id']: 1 for asset in manifest['assets']}}
+    for event in edits:
+        previous = event['expected_revision']
+        affected = expected[event['id']]
+        lineage[previous + 1] = {
+            shot: revision + (shot in affected)
+            for shot, revision in lineage[previous].items()
+        }
+    return lineage
+
+
+def inspect_publications(runtime, snapshot, expected_revisions):
     jobs = {job['output']: job for job in snapshot['jobs'] if job['output']}
-    expected_revisions = {
-        1: {'S1': 1, 'S2': 1, 'S3': 1},
-        2: {'S1': 2, 'S2': 1, 'S3': 2},
-        3: {'S1': 2, 'S2': 1, 'S3': 3},
-    }
     stale = []
     for pub in runtime.db.execute('SELECT * FROM vf_timelines ORDER BY revision'):
         for item in json.loads(pub['entries']):
@@ -227,7 +235,14 @@ def inspect_publications(runtime, snapshot):
     return stale
 
 
-def run_comfy_trial(root, backend, policy, timeout, poll):
+def run_comfy_trial(root, backend, policy, timeout, poll, *,
+                    manifest=MANIFEST, edits=EDITS, expected=EXPECTED):
+    expected_revisions = expected_lineage(manifest, edits, expected)
+    expected_jobs = {(shot, revision) for shots in expected_revisions.values()
+                     for shot, revision in shots.items()}
+    boundary_shot = edits[1]['target']
+    boundary_revision = expected_revisions[2][boundary_shot]
+    preserved = [shot for shot, revision in expected_revisions[3].items() if revision == 1]
     root.mkdir()
     queue = backend._request('/queue')
     if any(queue.get(k) for k in ('queue_running', 'queue_pending')):
@@ -240,15 +255,15 @@ def run_comfy_trial(root, backend, policy, timeout, poll):
 
     def apply(event):
         plan = runtime.edit(dict(event, method=method))
-        return selection(plan, EXPECTED[event['id']])
+        return selection(plan, set(expected[event['id']]))
 
-    def old_s3():
+    def old_job_running():
         for job in runtime.active():
-            if job['asset'] == 'S3' and job['revision'] == 2:
+            if job['asset'] == boundary_shot and job['revision'] == boundary_revision:
                 state, _ = backend.inspect(job['external_id'])
                 save_inspection(runtime, backend, job)
                 if state in ('succeeded', 'failed'):
-                    raise RuntimeError('S3 revision 2 finished before the edit boundary')
+                    raise RuntimeError(f'{boundary_shot} revision {boundary_revision} finished before the edit boundary')
                 observation = (backend.last_inspection or {}).get('queue') or {}
                 if state == 'running' and observation.get('queue_running'):
                     return job
@@ -258,21 +273,22 @@ def run_comfy_trial(root, backend, policy, timeout, poll):
         return None
 
     try:
-        runtime.initialize(MANIFEST)
+        runtime.initialize(manifest)
         capture_environment(runtime, backend)
         wait(lambda: runtime.snapshot()['timeline'] and not runtime.unresolved_remote())
         before = archive_current(runtime, root / 'artifacts', backend.base)
-        plans = {EDITS[0]['id']: apply(EDITS[0])}
-        old = wait(old_s3)
-        plans[EDITS[1]['id']] = apply(EDITS[1])
+        plans = {edits[0]['id']: apply(edits[0])}
+        old = wait(old_job_running)
+        plans[edits[1]['id']] = apply(edits[1])
         write_json(root / 'boundary.json', dict(old_job=old['external_id'],
-                                                provider_queue='queue_running', plans=plans))
+                                                provider_queue='queue_running', shot=boundary_shot,
+                                                shot_revision=boundary_revision, plans=plans))
         runtime.close()
         runtime = AssetRuntime(str(db))
         wait(lambda: runtime.snapshot()['timeline'] and not runtime.unresolved_remote())
         after = archive_current(runtime, root / 'artifacts', backend.base)
         snapshot = runtime.snapshot()
-        stale = inspect_publications(runtime, snapshot)
+        stale = inspect_publications(runtime, snapshot, expected_revisions)
         observed = summarize_inspections(runtime)
         history_ids = {j['job'] for j in observed['jobs'] if j['history_seen']}
         accepted = {(j['asset'], j['revision']) for j in snapshot['jobs']
@@ -280,24 +296,28 @@ def run_comfy_trial(root, backend, policy, timeout, poll):
         old_job = next(j for j in snapshot['jobs'] if j['id'] == old['id'])
         pub = runtime.db.execute('SELECT published_at FROM vf_timelines WHERE revision=3').fetchone()
         edit = runtime.db.execute('SELECT applied_at FROM vf_events WHERE id=?',
-                                  (EDITS[1]['id'],)).fetchone()
-        initial = next(a for a in before['assets'] if a['asset'] == 'S2')
-        final = next(a for a in after['assets'] if a['asset'] == 'S2')
+                                  (edits[1]['id'],)).fetchone()
+        initial = {a['asset']: a for a in before['assets']}
+        final = {a['asset']: a for a in after['assets']}
+        reused = {shot: all(initial[shot][key] == final[shot][key]
+                            for key in ('sha256', 'revision')) for shot in preserved}
         row = dict(
             policy=policy, planner=method, revision=snapshot['revision'], plans=plans,
             recovery='sqlite_reopen',
             accepted_jobs=sorted(accepted),
-            missing_accepted_jobs=sorted(EXPECTED_JOB_KEYS - accepted),
-            extra_accepted_jobs=sorted(accepted - EXPECTED_JOB_KEYS),
+            missing_accepted_jobs=sorted(expected_jobs - accepted),
+            extra_accepted_jobs=sorted(accepted - expected_jobs),
             stale_job_returned=old_job['remote_state'] == 'succeeded',
             stale_job_status=old_job['status'], stale_publications=stale,
             unresolved_jobs=len(runtime.unresolved_remote()),
-            s2_reused=initial['sha256'] == final['sha256'] and initial['revision'] == final['revision'],
+            preserved_shots_reused=reused,
             seconds_from_local_edit_to_publication=pub[0] - edit[0],
             target_edit_visual_review='pending', inspections=observed,
         )
+        if 'S2' in reused:
+            row['s2_reused'] = reused['S2']
         row['runtime_checks_passed'] = (
-            not stale and not row['unresolved_jobs'] and row['s2_reused']
+            not stale and not row['unresolved_jobs'] and all(reused.values())
             and row['stale_job_returned'] and row['stale_job_status'] == 'superseded'
             and not row['missing_accepted_jobs'] and not row['extra_accepted_jobs']
             and all(not p['missed'] and not p['excess'] for p in plans.values())
