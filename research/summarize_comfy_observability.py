@@ -72,7 +72,8 @@ def main():
                           raw=trials))
     paired = []
     for (suite, fault, policy, cap, story), runs in sorted(groups.items()):
-        control = 'replace_after_3' if suite == 'backoff' else 'project_version'
+        control = ('replace_after_3' if suite in ('backoff', 'ordered_recovery')
+                   else 'project_version')
         control_runs = groups.get((suite, fault, control, cap, story), {})
         if control == policy:
             continue

@@ -111,3 +111,18 @@ A duplicate repetition or incompatible batch is rejected.
       runs/comfy-observability-p0-01 \
       runs/comfy-observability-v26-r3 runs/comfy-observability-v26-r4 \
       runs/comfy-observability-v26-r5 > runs/comfy-observability-v26-summary.json
+
+### Ordered-story recovery policies
+
+Run the ordered outdoor-gear story with cap three and pair Wait, immediate
+replacement, and three-poll replacement in two seed configurations under
+both the first-two-polls and persistent masks. S6 has an order-only edge
+from S2 and starts after the edited S2 completes. S6 therefore measures
+downstream progress and cannot demonstrate reuse of a previously admitted
+S6. Keep the original independent-story results separate.
+
+    python -u research/recovery_observability_comfy.py --suite ordered_recovery --repetitions 2 --server http://127.0.0.1:8188 --output runs/comfy-observability-v28-ordered-01 --poll-seconds 5 --horizon-seconds 1200
+    python research/summarize_comfy_observability.py runs/comfy-observability-v28-ordered-01 > runs/comfy-observability-v28-ordered-01/paired-summary.json
+
+There are 12 trials. A persistently masked Wait trial can take the full
+1200-second horizon even after all upstream jobs have completed.

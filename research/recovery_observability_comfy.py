@@ -300,7 +300,7 @@ def main():
     parser.add_argument('--horizon-seconds', type=float, default=1200)
     parser.add_argument('--repetitions', type=int, default=1)
     parser.add_argument('--start-repetition', type=int, default=1)
-    parser.add_argument('--suite', choices=('primary', 'capacity', 'backoff', 'ordered'),
+    parser.add_argument('--suite', choices=('primary', 'capacity', 'backoff', 'ordered', 'ordered_recovery'),
                         default='primary')
     parser.add_argument('--pilot', action='store_true', help='run only the opaque/replace-after-3 cell')
     args = parser.parse_args()
@@ -320,6 +320,9 @@ def main():
     elif args.suite == 'backoff':
         cells = [(fault, policy, CAPACITY, 'independent') for fault in ('transient_wall', 'opaque')
                  for policy in ('replace_after_3', 'backoff_after_3')]
+    elif args.suite == 'ordered_recovery':
+        cells = [(fault, policy, CAPACITY, 'ordered') for fault in FAULTS
+                 for policy in ('wait', 'replace_now', 'replace_after_3')]
     elif args.suite == 'ordered':
         cells = [(fault, policy, CAPACITY, 'ordered') for fault in FAULTS
                  for policy in ('project_version', 'replace_after_3')]
@@ -333,7 +336,7 @@ def main():
                     horizon_seconds=args.horizon_seconds, capacity=CAPACITY,
                     repetitions=args.repetitions, start_repetition=args.start_repetition,
                     cells=[[fault, policy] for fault, policy, _, _ in cells] if args.suite == 'primary' else cells,
-                    admission_cap_applies='after edit; independent story starts with three accepted jobs',
+                    admission_cap_applies='after edit; initial accepted jobs depend on the story',
                     order='forward in odd repetitions, reverse in even repetitions',
                     seed_offset='10000 * zero-based repetition index')
     if args.suite == 'backoff':
