@@ -26,7 +26,8 @@ def load_batch(root):
         if any(row[key] != protocol[key] for key in ('horizon_seconds', 'poll_seconds')):
             raise ValueError(f'trial timing differs from protocol: {root}')
     settings = (protocol['horizon_seconds'], protocol['poll_seconds'], protocol['seed_offset'],
-                protocol.get('transient_mask_seconds'), protocol.get('backoff_max_seconds'))
+                protocol.get('transient_mask_seconds'), protocol.get('backoff_max_seconds'),
+                protocol.get('fixed_grace_seconds'))
     return suite, settings, zip(actual, rows)
 
 
@@ -72,8 +73,8 @@ def main():
                           raw=trials))
     paired = []
     for (suite, fault, policy, cap, story), runs in sorted(groups.items()):
-        control = ('replace_after_3' if suite in ('backoff', 'ordered_recovery')
-                   else 'project_version')
+        control = {'backoff': 'replace_after_3', 'ordered_recovery': 'replace_after_3',
+                   'grace': 'fixed_grace15'}.get(suite, 'project_version')
         control_runs = groups.get((suite, fault, control, cap, story), {})
         if control == policy:
             continue

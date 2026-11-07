@@ -24,6 +24,7 @@ THRESHOLDS = {'replace_now': 1, 'replace_after_3': 3, 'backoff_after_3': 3}
 CAPACITY = 3
 TRANSIENT_SECONDS = 12
 BACKOFF_MAX_SECONDS = 40
+FIXED_GRACE_SECONDS = 15
 S6_TEMPLATE = 'Static close-up of a {{color}} paper lantern on a dark shelf, natural light.'
 ORDERED_TEMPLATES = {
     'S2': 'Static close-up of a {{color}} map cover beside a trail marker.',
@@ -79,6 +80,7 @@ class WorkerBackend:
         self.next_probe = {}
         self.delays = {}
         self.probed = set()
+        self.unknown_probed = set()
 
     @property
     def last_inspection(self):
@@ -87,6 +89,8 @@ class WorkerBackend:
     def inspect(self, prompt_id):
         state, value = self.transport.inspect(prompt_id)
         self.probed.add(prompt_id)
+        if state == 'unknown':
+            self.unknown_probed.add(prompt_id)
         if self.backoff_seconds is not None:
             if state == 'unknown':
                 delay = self.delays.get(prompt_id, self.backoff_seconds)
@@ -222,11 +226,16 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
                 tracked_before = len(runtime.unresolved_remote())
                 capacity = max(0, recovery_cap - tracked_before)
                 backend.probed.clear()
+                backend.unknown_probed.clear()
+                probe_started = time.monotonic() - started
                 events = pass_once(polling, backend, max_submit=0)
                 elapsed = time.monotonic() - started
                 if threshold is not None:
                     streaks = replace_blocking_shot(runtime, threshold, streaks, replacements, elapsed,
                                                     backend.probed)
+                elif policy == 'fixed_grace15' and probe_started >= FIXED_GRACE_SECONDS:
+                    # Use a fresh observation from this pass, not an older unknown.
+                    replace_blocking_shot(runtime, 1, {}, replacements, elapsed, backend.unknown_probed)
                 accepted_before = len(transport.accepted)
                 events.extend(pass_once(SubmissionView(runtime), backend, max_submit=capacity))
                 admitted = len(transport.accepted) - accepted_before
@@ -243,6 +252,7 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
                 inspect_upstream(runtime, auditor, transport.accepted, observed)
                 log.write(json.dumps(dict(elapsed=elapsed, events=events, tracked=len(unresolved),
                                           tracked_before=tracked_before, admitted=admitted,
+                                          probe_started=probe_started,
                                           target_probed=transport.target in backend.probed,
                                           masked_polls=transport.masked_polls, upstream=observed)) + '\n')
                 log.flush()
@@ -300,7 +310,7 @@ def main():
     parser.add_argument('--horizon-seconds', type=float, default=1200)
     parser.add_argument('--repetitions', type=int, default=1)
     parser.add_argument('--start-repetition', type=int, default=1)
-    parser.add_argument('--suite', choices=('primary', 'capacity', 'backoff', 'ordered', 'ordered_recovery'),
+    parser.add_argument('--suite', choices=('primary', 'capacity', 'backoff', 'ordered', 'ordered_recovery', 'grace'),
                         default='primary')
     parser.add_argument('--pilot', action='store_true', help='run only the opaque/replace-after-3 cell')
     args = parser.parse_args()
@@ -310,8 +320,8 @@ def main():
         parser.error('require 0 < poll < horizon and positive repetition numbers')
     if args.pilot and args.suite != 'primary':
         parser.error('--pilot requires --suite primary')
-    if args.suite == 'backoff' and (args.poll_seconds != 5 or args.horizon_seconds <= 30):
-        parser.error('backoff suite requires 5-second polls and a horizon above 30 seconds')
+    if args.suite in ('backoff', 'grace') and (args.poll_seconds != 5 or args.horizon_seconds <= 30):
+        parser.error('backoff and grace suites require 5-second polls and a horizon above 30 seconds')
     if args.pilot:
         cells = [('opaque', 'replace_after_3', CAPACITY, 'independent')]
     elif args.suite == 'capacity':
@@ -320,6 +330,9 @@ def main():
     elif args.suite == 'backoff':
         cells = [(fault, policy, CAPACITY, 'independent') for fault in ('transient_wall', 'opaque')
                  for policy in ('replace_after_3', 'backoff_after_3')]
+    elif args.suite == 'grace':
+        cells = [(fault, policy, CAPACITY, 'independent') for fault in ('transient_wall', 'opaque')
+                 for policy in ('fixed_grace15', 'backoff_after_3')]
     elif args.suite == 'ordered_recovery':
         cells = [(fault, policy, CAPACITY, 'ordered') for fault in FAULTS
                  for policy in ('wait', 'replace_now', 'replace_after_3')]
@@ -339,8 +352,10 @@ def main():
                     admission_cap_applies='after edit; initial accepted jobs depend on the story',
                     order='forward in odd repetitions, reverse in even repetitions',
                     seed_offset='10000 * zero-based repetition index')
-    if args.suite == 'backoff':
+    if args.suite in ('backoff', 'grace'):
         protocol.update(transient_mask_seconds=TRANSIENT_SECONDS, backoff_max_seconds=BACKOFF_MAX_SECONDS)
+    if args.suite == 'grace':
+        protocol['fixed_grace_seconds'] = FIXED_GRACE_SECONDS
     write_json(args.output / 'protocol.json', protocol)
     rows = []
     for rep in range(args.start_repetition, args.start_repetition + args.repetitions):
