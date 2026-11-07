@@ -14,7 +14,7 @@ from asset_runtime import AssetRuntime
 from asset_worker import pass_once
 from comfyui import ComfyUI, SubmissionUncertain
 from provider_audit import capture_environment, save_inspection, summarize_inspections
-from recovery_comfy import SEEDS, TEMPLATES, apply_local_edit
+from recovery_comfy import SEEDS, TEMPLATES, apply_local_edit, reconcile
 from recovery_matrix import SubmissionView, reject_old_project_work
 
 
@@ -25,6 +25,8 @@ CAPACITY = 3
 TRANSIENT_SECONDS = 12
 BACKOFF_MAX_SECONDS = 40
 FIXED_GRACE_SECONDS = 15
+WORKFLOW_POLICIES = ('workflow_grace', 'videoflow_backoff3')
+WORKFLOW_FAULTS = ('transient_wall', 'opaque')
 S6_TEMPLATE = 'Static close-up of a {{color}} paper lantern on a dark shelf, natural light.'
 ORDERED_TEMPLATES = {
     'S2': 'Static close-up of a {{color}} map cover beside a trail marker.',
@@ -36,10 +38,11 @@ ORDERED_TEMPLATES = {
 class FaultTransport:
     """Intercept the worker's ACK/inspection interface above actual HTTP calls."""
 
-    def __init__(self, upstream, fault):
+    def __init__(self, upstream, fault, transient_seconds=TRANSIENT_SECONDS):
         self.upstream = upstream
         self.base = upstream.base
         self.fault = fault
+        self.transient_seconds = transient_seconds
         self.target = None
         self.masked_polls = 0
         self.accepted = {}
@@ -50,7 +53,8 @@ class FaultTransport:
         # Only the first S4 submission is targeted. The genuine response is
         # recorded for the independent observer before the worker loses it.
         confirmed = self.upstream.submit(workflow, prompt_id)
-        self.accepted[confirmed] = {'shot': shot, 'accepted_at': time.monotonic()}
+        self.accepted[confirmed] = {'shot': shot, 'accepted_at': time.monotonic(),
+                                    'accepted_wall': time.time()}
         if shot == 'S4' and self.target is None:
             self.target = confirmed
             raise SubmissionUncertain('injected ACK loss after upstream acceptance')
@@ -61,7 +65,7 @@ class FaultTransport:
         if prompt_id == self.target and (
                 self.fault == 'opaque'
                 or (self.fault == 'transient' and self.masked_polls < 2)
-                or (self.fault == 'transient_wall' and time.monotonic() - self.started < TRANSIENT_SECONDS)):
+                or (self.fault == 'transient_wall' and time.monotonic() - self.started < self.transient_seconds)):
             self.masked_polls += 1
             return 'unknown', None
         result = self.upstream.inspect(prompt_id)
@@ -175,13 +179,14 @@ def stale_publications(runtime):
 
 
 def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
-              recovery_cap=CAPACITY, story='independent'):
+              recovery_cap=CAPACITY, story='independent', *, transient_seconds=TRANSIENT_SECONDS,
+              workflow_grace=FIXED_GRACE_SECONDS, workflow_fixed_poll=False, drain_seconds=0):
     root.mkdir()
     queue = upstream._request('/queue')
     if queue.get('queue_running') or queue.get('queue_pending'):
         raise RuntimeError('use a dedicated idle ComfyUI queue')
     auditor = ComfyUI(upstream.base, upstream.timeout)
-    transport = FaultTransport(upstream, fault)
+    transport = FaultTransport(upstream, fault, transient_seconds)
     runtime = AssetRuntime(str(root / 'project.db'))
     try:
         templates = ORDERED_TEMPLATES if story == 'ordered' else {**TEMPLATES, 'S6': S6_TEMPLATE}
@@ -206,19 +211,28 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
                    original_ids=original_ids, hidden_ack=transport.target, upstream=observed))
         started = time.monotonic()
         transport.started = started
-        apply_local_edit(runtime, 1, 'S2', 'blue')
+        if policy == 'videoflow_backoff3':
+            plan = runtime.edit(dict(id='edit-1', expected_revision=1, method='dair',
+                                     target='S2', key='color', value='blue'))
+            if plan['regenerate'] != ['S2']:
+                raise RuntimeError(f'unexpected edit plan: {plan}')
+        else:
+            apply_local_edit(runtime, 1, 'S2', 'blue')
         if policy == 'project_version':
             reject_old_project_work(runtime)
         runtime.close()
         runtime = AssetRuntime(str(root / 'project.db'))
-        backend = WorkerBackend(transport, runtime, poll if policy == 'backoff_after_3' else None)
+        use_backoff = policy in ('backoff_after_3', 'videoflow_backoff3') or (
+            policy == 'workflow_grace' and not workflow_fixed_poll)
+        backend = WorkerBackend(transport, runtime, poll if use_backoff else None)
         polling = PollingView(runtime, backend)
         replacements, streaks = {}, {}
         ready = None
         peak = len(original_ids)
         maximum = max(peak, recovery_cap)
         first_admission = None
-        threshold = THRESHOLDS.get(policy)
+        threshold = 3 if policy == 'videoflow_backoff3' else THRESHOLDS.get(policy)
+        first_unknown_probe = {}
         with (root / 'worker.jsonl').open('w', encoding='utf-8') as log:
             while time.monotonic() - started < horizon:
                 # Match the simulator: capacity comes from the ledger at the
@@ -228,11 +242,22 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
                 backend.probed.clear()
                 backend.unknown_probed.clear()
                 probe_started = time.monotonic() - started
-                events = pass_once(polling, backend, max_submit=0)
+                if policy == 'workflow_grace':
+                    events = reconcile(polling, backend)
+                else:
+                    events = pass_once(polling, backend, max_submit=0)
                 elapsed = time.monotonic() - started
                 if threshold is not None:
                     streaks = replace_blocking_shot(runtime, threshold, streaks, replacements, elapsed,
                                                     backend.probed)
+                elif policy == 'workflow_grace':
+                    for prompt_id in backend.probed - backend.unknown_probed:
+                        first_unknown_probe.pop(prompt_id, None)
+                    due = {prompt_id for prompt_id in backend.unknown_probed
+                           if probe_started - first_unknown_probe.setdefault(prompt_id, probe_started)
+                           >= workflow_grace}
+                    if due:
+                        replace_blocking_shot(runtime, 1, {}, replacements, elapsed, due)
                 elif policy == 'fixed_grace15' and probe_started >= FIXED_GRACE_SECONDS:
                     # Use a fresh observation from this pass, not an older unknown.
                     replace_blocking_shot(runtime, 1, {}, replacements, elapsed, backend.unknown_probed)
@@ -268,14 +293,46 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
                 if remaining > 0:
                     time.sleep(min(poll, remaining))
 
+        if drain_seconds:
+            drain_deadline = time.monotonic() + drain_seconds
+            while len(observed) != len(transport.accepted) or any(state == 'running' or state == 'unknown'
+                                                               for state in observed.values()):
+                if time.monotonic() >= drain_deadline:
+                    break
+                inspect_upstream(runtime, auditor, transport.accepted, observed)
+                if len(observed) == len(transport.accepted) and all(
+                        state in ('succeeded', 'failed') for state in observed.values()):
+                    break
+                time.sleep(min(poll, max(0, drain_deadline - time.monotonic())))
+            write_json(root / 'upstream-drain.json', observed)
+
         stale = stale_publications(runtime)
         accepted_by_shot = dict(Counter(info['shot'] for info in transport.accepted.values()))
         edited = runtime.db.execute('SELECT applied_at FROM vf_events WHERE revision=2').fetchone()[0]
         latency = ready - edited if ready is not None else None
         inspections = summarize_inspections(runtime)
+        histories_by_job = {job['job']: job for job in inspections['jobs']}
+        final_snapshot = runtime.snapshot()
+        final_outputs = {(item['asset'], item['output']) for item in final_snapshot['timeline'] or []}
+        provider_times = []
+        for job in final_snapshot['jobs']:
+            acceptance = transport.accepted.get(job['external_id'])
+            if acceptance is None:
+                continue
+            history = histories_by_job.get(job['id'], {})
+            provider_times.append(dict(
+                shot=job['asset'], prompt_id=job['external_id'],
+                used_in_manifest=(job['asset'], job['output']) in final_outputs,
+                acceptance_reply_wall=acceptance['accepted_wall'],
+                execution_started_wall=history.get('execution_started_wall'),
+                execution_span_seconds=history.get('execution_span_seconds'),
+            ))
         result = dict(
             policy=policy, fault=fault, horizon_seconds=horizon, poll_seconds=poll,
-            story=story, recovery_cap=recovery_cap, pre_edit_inflight=len(original_ids),
+            story=story, seed_offset=seed_offset, recovery_cap=recovery_cap,
+            transient_mask_seconds=transient_seconds if fault == 'transient_wall' else None,
+            workflow_grace_seconds=workflow_grace if policy == 'workflow_grace' else None,
+            probe_schedule='exponential' if use_backoff else 'fixed', pre_edit_inflight=len(original_ids),
             first_admission_seconds=first_admission,
             correct_publication_seconds=latency if not stale and latency is not None and latency <= horizon else None,
             stale_publications=stale, replacements=replacements,
@@ -290,13 +347,13 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
             tracked_unresolved=[{'shot': j['asset'], 'id': j['external_id']}
                                 for j in runtime.unresolved_remote()],
             peak_tracked_unresolved=peak, masked_polls=transport.masked_polls,
-            provider_history=inspections,
+            provider_history=inspections, provider_times=provider_times,
         )
         write_json(root / 'report.json', result)
         if stale or peak > maximum or not transport.masked_polls:
             raise RuntimeError(f'experiment invariant failed: {root}/report.json')
-        if any(state != 'succeeded' for state in observed.values()):
-            raise RuntimeError(f'provider did not drain by the horizon: {root}/report.json')
+        if set(observed) != set(transport.accepted) or any(state != 'succeeded' for state in observed.values()):
+            raise RuntimeError(f'provider did not drain successfully within the observation window: {root}/report.json')
         return result
     finally:
         runtime.close()
@@ -310,19 +367,36 @@ def main():
     parser.add_argument('--horizon-seconds', type=float, default=1200)
     parser.add_argument('--repetitions', type=int, default=1)
     parser.add_argument('--start-repetition', type=int, default=1)
-    parser.add_argument('--suite', choices=('primary', 'capacity', 'backoff', 'ordered', 'ordered_recovery', 'grace'),
+    parser.add_argument('--suite', choices=('primary', 'capacity', 'backoff', 'ordered', 'ordered_recovery', 'grace',
+                                            'workflow', 'workflow_capacity'),
                         default='primary')
-    parser.add_argument('--pilot', action='store_true', help='run only the opaque/replace-after-3 cell')
+    parser.add_argument('--pilot', action='store_true', help='run the primary opaque cell or one workflow pilot pair')
+    parser.add_argument('--workflow-mask-seconds', type=float, default=TRANSIENT_SECONDS)
+    parser.add_argument('--workflow-grace-seconds', type=float, default=FIXED_GRACE_SECONDS)
+    parser.add_argument('--workflow-fixed-poll', action='store_true')
+    parser.add_argument('--workflow-drain-seconds', type=float, default=600)
     args = parser.parse_args()
+    workflow_suite = args.suite in ('workflow', 'workflow_capacity')
+    if workflow_suite and (not 0 < args.workflow_mask_seconds < args.horizon_seconds
+                           or not 0 < args.workflow_grace_seconds < args.horizon_seconds
+                           or not 0 <= args.workflow_drain_seconds < float('inf')):
+        parser.error('workflow mask and grace must be positive and below the horizon; drain must be finite')
     if (not math.isfinite(args.horizon_seconds)
             or not 0 < args.poll_seconds < args.horizon_seconds
             or min(args.repetitions, args.start_repetition) < 1):
         parser.error('require 0 < poll < horizon and positive repetition numbers')
-    if args.pilot and args.suite != 'primary':
-        parser.error('--pilot requires --suite primary')
-    if args.suite in ('backoff', 'grace') and (args.poll_seconds != 5 or args.horizon_seconds <= 30):
-        parser.error('backoff and grace suites require 5-second polls and a horizon above 30 seconds')
-    if args.pilot:
+    if args.pilot and (args.suite not in ('primary', 'workflow') or args.repetitions != 1):
+        parser.error('--pilot requires primary or workflow and one repetition')
+    if args.suite in ('backoff', 'grace', 'workflow', 'workflow_capacity') and (args.poll_seconds != 5 or args.horizon_seconds <= 30):
+        parser.error('backoff, grace, and workflow suites require 5-second polls and a horizon above 30 seconds')
+    if args.pilot and args.suite == 'workflow':
+        cells = [('opaque', policy, CAPACITY, 'independent') for policy in WORKFLOW_POLICIES]
+    elif args.suite in ('workflow', 'workflow_capacity'):
+        settings = ([(CAPACITY, 'independent'), (CAPACITY, 'ordered')] if args.suite == 'workflow'
+                    else [(2, 'independent'), (4, 'independent')])
+        cells = [(fault, policy, cap, story) for cap, story in settings
+                 for fault in WORKFLOW_FAULTS for policy in WORKFLOW_POLICIES]
+    elif args.pilot:
         cells = [('opaque', 'replace_after_3', CAPACITY, 'independent')]
     elif args.suite == 'capacity':
         cells = [(fault, policy, cap, 'independent') for cap in (2, 4) for fault in FAULTS
@@ -352,8 +426,15 @@ def main():
                     admission_cap_applies='after edit; initial accepted jobs depend on the story',
                     order='forward in odd repetitions, reverse in even repetitions',
                     seed_offset='10000 * zero-based repetition index')
-    if args.suite in ('backoff', 'grace'):
+    if args.suite in ('backoff', 'grace', 'workflow', 'workflow_capacity'):
         protocol.update(transient_mask_seconds=TRANSIENT_SECONDS, backoff_max_seconds=BACKOFF_MAX_SECONDS)
+    if workflow_suite:
+        protocol.update(transient_mask_seconds=args.workflow_mask_seconds,
+                        workflow_grace_seconds=args.workflow_grace_seconds,
+                        workflow_polling='fixed' if args.workflow_fixed_poll else 'exponential',
+                        audit_drain_seconds=args.workflow_drain_seconds,
+                        comparison='shared SQLite runtime; independent planners and reconciliation; no external workflow engine',
+                        provider_duration='wall execution span includes host work; no GPU device time')
     if args.suite == 'grace':
         protocol['fixed_grace_seconds'] = FIXED_GRACE_SECONDS
     write_json(args.output / 'protocol.json', protocol)
@@ -361,12 +442,18 @@ def main():
     for rep in range(args.start_repetition, args.start_repetition + args.repetitions):
         for fault, policy, cap, story in (cells if rep % 2 else reversed(cells)):
             suffix = f'-cap{cap}' if args.suite == 'capacity' else ''
+            if args.suite in ('workflow', 'workflow_capacity'):
+                suffix = f'-{story}-cap{cap}'
             label = f'{rep:02d}-{fault}-{policy}{suffix}'
             print(f'START {label}', flush=True)
             try:
                 result = run_trial(args.output / label, upstream, policy, fault,
                                    args.poll_seconds, args.horizon_seconds, 10000 * (rep - 1),
-                                   recovery_cap=cap, story=story)
+                                   recovery_cap=cap, story=story, **(
+                                       dict(transient_seconds=args.workflow_mask_seconds,
+                                            workflow_grace=args.workflow_grace_seconds,
+                                            workflow_fixed_poll=args.workflow_fixed_poll,
+                                            drain_seconds=args.workflow_drain_seconds) if workflow_suite else {}))
             except Exception as exc:
                 write_json(args.output / 'summary.json', dict(complete=False, failed=label,
                            error=str(exc), rows=rows))

@@ -37,6 +37,7 @@ def summarize_inspections(runtime):
             if kind=='execution_start':start=body.get('timestamp')
             if kind in ('execution_success','execution_error'):end=body.get('timestamp')
         if isinstance(start,(int,float)) and isinstance(end,(int,float)) and end>=start:
+            record['execution_started_wall']=start/1000
             record['execution_span_seconds']=(end-start)/1000
     return dict(jobs_with_observations=len(grouped),jobs=list(grouped.values()),gpu_seconds=None,
         environments=[dict(backend=r['backend'],observed_at=r['observed_at'],payload=None if r['payload'] is None else json.loads(r['payload']),error=r['error']) for r in runtime.db.execute('SELECT * FROM vf_provider_environment ORDER BY id')],
