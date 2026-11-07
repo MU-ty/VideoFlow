@@ -115,3 +115,39 @@ python research/audit_archived_cost.py /path/to/v3.8/evidence --output archived_
 ```
 
 第一、二条无需 GPU，第二条需要 ffmpeg 和 ffprobe。第三条读取原 v3.8 复现包里的证据压缩档，需要本地持有该复现包。
+
+## v3.9 后续：真实引用链复核
+
+从 `research/reference-evidence` 运行。先复核已有试验并导出真实配图素材，
+这一步读取已有文件，无需 GPU。
+
+```bash
+export PATH="$HOME/apps/videoflow-ffmpeg:$PATH"
+python research/audit_reference_case.py runs/reference-chain-pilot-01/01-dair \
+  --output runs/reference-chain-pilot-01/audit.json \
+  --frames runs/reference-chain-pilot-01/figure-frames &&
+tar -czf "$HOME/videoflow-figure4.tar.gz" -C runs/reference-chain-pilot-01 \
+  audit.json figure-frames
+```
+
+配图用 revision 1 和 revision 3 的真实输入与输出，标出三条参考帧边及 S5
+复用。输入 PNG 是原始上传字节。输出 PNG 是归档视频在 0.2 秒处的样本。
+已有单种子案例单列。
+
+先固定链结构和两次编辑触发条件，再运行两组配对种子 3107、7200。
+比较 DAIR、属性 Worklist 和全量失效，共六次真实运行，第二组反转方法顺序。
+按种子对照引用来源、独立镜头复用、旧结果拒收、提交意图和发布时间。
+
+```bash
+python -u research/recovery_reference_comfy.py --story chain \
+  --methods dair attr_dag full --supersede --repetitions 2 \
+  --server http://127.0.0.1:8188 --output runs/reference-chain-paired2-01
+```
+
+现有 20 次强对照可单独做原始记录审计。Provider 执行跨度含主机工作。
+接受应答到开始执行是带符号的排队代理量，立即开始时可能为负。
+
+```bash
+python research/audit_workflow_run.py runs/workflow-paired5-01 \
+  --output runs/workflow-paired5-01/raw-audit.json
+```

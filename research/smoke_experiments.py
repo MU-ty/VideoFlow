@@ -17,6 +17,7 @@ import recovery_reference_comfy as reference
 from comfyui import ComfyUI
 from smoke_grace import Clock, Provider
 from summarize_workflow import summarize
+from audit_reference_case import audit as audit_reference
 
 
 def smoke_workflow(root):
@@ -164,6 +165,11 @@ def smoke_reference(root):
                 jobs.clear()
                 report = reference.run_trial(root / f'{story}-{method}', backend, story, method, 3107,
                                              cap=2, poll=0.01, horizon=25, supersede=True)
+                export_frames = root / 'exported-frames' if (story, method) == ('chain', 'dair') else None
+                audited = audit_reference(root / f'{story}-{method}', frames=export_frames)
+                assert audited['changed_reference_frame_edges'] == report['changed_reference_frame_edges']
+                if export_frames is not None:
+                    assert len(list(export_frames.glob('*.png'))) == 16
                 assert report['stale_result_rejected']
                 assert len(report['changed_reference_frame_edges']) == 3
                 assert report['independent_reused'] == (method != 'full')

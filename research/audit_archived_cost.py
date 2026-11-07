@@ -12,12 +12,12 @@ from recovery_observability_comfy import FAULTS
 from artifacts import write_json
 
 
-def trial(zipped, filename, temp):
+def trial(read_bytes, filename, temp):
     path = PurePosixPath(filename)
-    read = lambda name: json.loads(zipped.read(str(path.parent / name)))
-    protocol = json.loads(zipped.read(str(path.parent.parent / 'protocol.json')))
+    read = lambda name: json.loads(read_bytes(str(path.parent / name)))
+    protocol = json.loads(read_bytes(str(path.parent.parent / 'protocol.json')))
     report, boundary = read('report.json'), read('boundary.json')
-    temp.write_bytes(zipped.read(filename))
+    temp.write_bytes(read_bytes(filename))
     with sqlite3.connect(temp) as db:
         db.row_factory = sqlite3.Row
         assert db.execute('PRAGMA quick_check').fetchone()[0] == 'ok'
@@ -39,6 +39,9 @@ def trial(zipped, filename, temp):
         assert timeline and abs(timeline['published_at'] - applied - report['correct_publication_seconds']) < 1e-6
     used = {(item['asset'], item['output']) for item in json.loads(timeline['entries'])} if on_time else set()
     costs = []
+    provider_times = {entry['prompt_id']: entry for entry in report.get('provider_times', [])}
+    if provider_times and set(provider_times) != set(jobs):
+        raise ValueError('timing report job identities differ from ledger')
     for pid, job in jobs.items():
         history = histories[pid]['status']
         assert report['upstream_states'][pid] == 'succeeded' and history['completed'] and history['status_str'] == 'success'
@@ -46,9 +49,17 @@ def trial(zipped, filename, temp):
                   if key in ('execution_start', 'execution_success') and value['prompt_id'] == pid}
         elapsed = (stamps['execution_success'] - stamps['execution_start']) / 1000
         assert elapsed >= 0
-        costs.append(dict(shot=job['asset'], original=pid in boundary['original_ids'].values(),
-                          in_final_manifest=(job['asset'], job['output']) in used if on_time else None,
-                          ledger_status=job['status'], backend_span_seconds=elapsed))
+        cost = dict(shot=job['asset'], original=pid in boundary['original_ids'].values(),
+                    in_final_manifest=(job['asset'], job['output']) in used if on_time else None,
+                    ledger_status=job['status'], backend_span_seconds=elapsed)
+        if pid in provider_times:
+            timing = provider_times[pid]
+            if (timing['execution_span_seconds'] != elapsed
+                    or timing['execution_started_wall'] != stamps['execution_start'] / 1000):
+                raise ValueError(f'provider timing differs from history: {pid}')
+            cost['acceptance_reply_to_start_seconds'] = round(
+                timing['execution_started_wall'] - timing['acceptance_reply_wall'], 3)
+        costs.append(cost)
     unused = [job for job in costs if job['in_final_manifest'] is False]
     return dict(batch=path.parts[0], trial=path.parent.name, repetition=int(path.parent.name.split('-')[0]),
                 suite=protocol.get('suite', 'primary'), story=report.get('story', 'independent'),
@@ -89,7 +100,7 @@ def main():
             with ZipFile(source) as zipped:
                 for path in sorted(zipped.namelist()):
                     if path.endswith('/project.db'):
-                        rows.append(trial(zipped, path, temp))
+                        rows.append(trial(zipped.read, path, temp))
     keys = {(row['suite'], row['story'], row['cap'], row['fault'], row['policy'], row['repetition']) for row in rows}
     if len(rows) != 96 or len(keys) != 96 or sum(len(row['jobs']) for row in rows) != 464:
         raise ValueError('expected the 96 unique v3.8 trials and 464 accepted jobs')
