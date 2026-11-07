@@ -9,25 +9,66 @@
 | 新实验的真实 GPU 数据 | 待 worker-0 运行 | 模拟结果和测试素材只用于核验程序 |
 
 
-## 在 worker-0 跑两个真实 pilot
+## 第一阶段：在 worker-0 跑一个真实配对 pilot
 
-拉取 `research/experiment-round1` 分支后进入 VideoFlow 仓库根目录。要求 Python 3.10+、ffmpeg、ffprobe、已加载 H3 权重的 ComfyUI 和独占的空闲队列。以下命令按顺序运行。每条命令使用新的输出目录。
+拉取 `research/workflow-pair-pilot` 后从 VideoFlow 仓库根目录执行。
+要求 Python 3.10+、已加载 H3 权重的 ComfyUI 和独占的空闲队列。
+每次试验使用新的输出目录。
 
 ```bash
 curl -fsS http://127.0.0.1:8188/system_stats >/dev/null
 
 python -u research/recovery_observability_comfy.py \
-  --suite workflow --pilot --server http://127.0.0.1:8188 \
-  --output runs/workflow-pilot-01
+  --suite workflow --workflow-story independent --pilot \
+  --server http://127.0.0.1:8188 --output runs/workflow-pair-pilot-01 &&
+python research/summarize_workflow.py runs/workflow-pair-pilot-01 \
+  --output runs/workflow-pair-pilot-01/paired.json
+```
 
+这两次运行共用持续遮蔽轨迹。汇总会拒绝失效集合、首轮在途镜头、
+可用提交槽位或首个 S4 遮蔽观测不一致的配对。通过时，报告中的
+`boundary` 应显示只失效 S2、S2/S4/S6 均在途、首轮可用槽位为 0，
+且首个 S4 探测被遮蔽。之后每轮的可用槽位和实际遮蔽观测记录在
+`worker.jsonl`，用于解释不同策略执行后的容量变化。
+
+## 第二阶段：五个配对种子
+
+Pilot 的配对边界通过后再执行。正式批次在独立镜头轨迹上运行
+5 种子 × 2 遮蔽 × 2 策略，共 20 次，采用 12 秒短暂遮蔽和持续遮蔽。
+
+```bash
+python -u research/recovery_observability_comfy.py \
+  --suite workflow --workflow-story independent --repetitions 5 \
+  --server http://127.0.0.1:8188 --output runs/workflow-paired5-01 &&
+python research/summarize_workflow.py runs/workflow-paired5-01 \
+  --output runs/workflow-paired5-01/paired.json
+```
+
+按遮蔽条件报告正确发布率、仅在双方均按时发布时计算的逐对延迟差，
+以及原 S4 首次接受之外的重复接受数。S2 依编辑产生的必要重生成不计为
+重复接受。保留每次运行的 `boundary.json`、`report.json`、`worker.jsonl`
+和 SQLite 账本。若两种策略的结果接近，就将论文结论限定在连续编辑下的
+镜头复用与安全发布机制。若有稳定差异，再用替换排队、后端接受和 Manifest
+提交记录定位原因。这里的强基线是工作流策略对照。
+
+## 可选：真实生成引用链 pilot
+
+主对照完成且 GPU 有余量时执行。此命令另需 ffmpeg 和 ffprobe。
+
+```bash
 python -u research/recovery_reference_comfy.py \
   --story chain --methods dair --supersede --server http://127.0.0.1:8188 \
   --output runs/reference-pilot-01
 ```
 
-第一条 Python 命令跑一组持续遮蔽配对。第二条跑五个镜头并验证连续编辑的版本 1 和版本 3。版本 2 的 S1 必须已进入后端，版本 3 才提交编辑。程序会检查旧 S1 确实在后端成功、未在账本提交且版本 2 未发布。H3 节点能力通过服务器的 object_info 在运行前确认。上游视频的第一帧通过 FFmpeg 提取，按内容哈希上传并回读验证，然后接入下游 H3 的 first_frame。另有独立 S5 作为复用对照。
+实际运行的链是 S1→S2→S3→S4，S5 独立。上游已提交视频的第一帧
+通过 FFmpeg 提取，按内容哈希上传，回读验证后绑定到下游 H3 的
+`first_frame`。查看 `report.json` 中各条引用边的前后哈希、
+`changed_reference_frame_edges`、`independent_reused` 和
+`stale_result_rejected`。连续编辑时，脚本要求版本 2 的 S1
+已进入后端后才提交版本 3，并核对旧结果在后端成功却未提交到版本 3。
 
-## 正式矩阵
+## 可选扩展矩阵
 
 | 批次 | 规模 | 问题 |
 | --- | --- | --- |

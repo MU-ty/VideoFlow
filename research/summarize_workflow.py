@@ -13,7 +13,7 @@ def difference(left, right):
     return None if left is None or right is None else left - right
 
 
-def summarize(rows):
+def summarize(rows, require_boundary=False):
     grouped = defaultdict(dict)
     for row in rows:
         key = (row['story'], row['recovery_cap'], row['fault'], row['repetition'])
@@ -29,6 +29,20 @@ def summarize(rows):
         if any(videoflow[field] != baseline[field]
                for field in ('poll_seconds', 'horizon_seconds', 'pre_edit_inflight', 'seed_offset', 'transient_mask_seconds')):
             raise ValueError('workflow pair uses mismatched execution settings')
+        boundary = baseline.get('workflow_pair')
+        if boundary != videoflow.get('workflow_pair') or (require_boundary and boundary is None):
+            raise ValueError(f'missing or mismatched workflow pair boundary: {(story, cap, fault, repetition)}')
+        if boundary is not None:
+            initial_shots = ['S2', 'S4'] if story == 'ordered' else ['S2', 'S4', 'S6']
+            if (not boundary.get('provider')
+                    or boundary['regenerate'] != ['S2']
+                    or boundary['initial_shots'] != initial_shots
+                    or boundary['hidden_ack_shot'] != 'S4'
+                    or boundary['first_poll_tracked'] != len(initial_shots)
+                    or boundary['first_poll_slots'] != max(0, cap - len(initial_shots))
+                    or boundary['first_s4_probe_masked'] is not True):
+                raise ValueError(f'invalid workflow pair boundary: {(story, cap, fault, repetition)}')
+
         def span(row):
             durations = [job['execution_span_seconds'] for job in row['provider_times']]
             if len(durations) == row['accepted_count'] and all(d is not None for d in durations):
@@ -37,15 +51,19 @@ def summarize(rows):
 
         def outcome(row):
             latency = row['correct_publication_seconds']
+            s4_acceptances = row['accepted_by_shot'].get('S4', 0)
             return dict(published_by_deadline=latency is not None, publication_seconds=latency,
                         stale_publications=len(row['stale_publications']), acceptances=row['accepted_count'],
-                        s4_acceptances=row['accepted_by_shot'].get('S4', 0),
+                        s4_acceptances=s4_acceptances,
+                        s4_repeat_acceptances=max(0, s4_acceptances - 1),
+                        s4_replacement_queued_seconds=row['replacements'].get('S4', {}).get('queued_after_seconds'),
                         original_s6_reused=row['original_s6_reused'], masked_polls=row['masked_polls'],
                         backend_execution_span_seconds=span(row))
 
         base_outcome, vf_outcome = outcome(baseline), outcome(videoflow)
         strata[(story, cap, fault)].append(dict(
-            repetition=repetition, baseline=base_outcome, videoflow=vf_outcome,
+            repetition=repetition, boundary=boundary, baseline=base_outcome, videoflow=vf_outcome,
+            s4_repeat_acceptances_delta=vf_outcome['s4_repeat_acceptances']-base_outcome['s4_repeat_acceptances'],
             publication_seconds_delta=difference(vf_outcome['publication_seconds'], base_outcome['publication_seconds']),
             acceptances_delta=vf_outcome['acceptances']-base_outcome['acceptances'],
             backend_execution_span_seconds_delta=difference(vf_outcome['backend_execution_span_seconds'],
@@ -54,9 +72,12 @@ def summarize(rows):
     for (story, cap, fault), pairs in sorted(strata.items()):
         published_deltas = [row['publication_seconds_delta'] for row in pairs
                             if row['publication_seconds_delta'] is not None]
+        baseline_published = sum(row['baseline']['published_by_deadline'] for row in pairs)
+        videoflow_published = sum(row['videoflow']['published_by_deadline'] for row in pairs)
         result.append(dict(story=story, cap=cap, fault=fault, pair_count=len(pairs),
-                           baseline_published=sum(row['baseline']['published_by_deadline'] for row in pairs),
-                           videoflow_published=sum(row['videoflow']['published_by_deadline'] for row in pairs),
+                           baseline_published=baseline_published, videoflow_published=videoflow_published,
+                           baseline_publish_rate=baseline_published / len(pairs),
+                           videoflow_publish_rate=videoflow_published / len(pairs),
                            both_published=len(published_deltas),
                            median_publication_seconds_delta=median(published_deltas) if published_deltas else None,
                            pairs=pairs))
@@ -78,7 +99,7 @@ def main():
     write_json(args.output, dict(evidence=protocol['evidence'], pilot=protocol['pilot'], protocol=protocol,
                                  delta='VideoFlow minus workflow strategy',
                                  timing='backend execution spans include host work, not GPU device time',
-                                 strata=summarize(raw['rows'])))
+                                 strata=summarize(raw['rows'], require_boundary=protocol.get('pair_boundary_audit', False))))
 
 
 if __name__ == '__main__':

@@ -210,6 +210,7 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
         write_json(root / 'boundary.json', dict(initial_events=initial_events,
                    original_ids=original_ids, hidden_ack=transport.target, upstream=observed))
         started = time.monotonic()
+        edit_barrier_wall = time.time()
         transport.started = started
         if policy == 'videoflow_backoff3':
             plan = runtime.edit(dict(id='edit-1', expected_revision=1, method='dair',
@@ -217,7 +218,7 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
             if plan['regenerate'] != ['S2']:
                 raise RuntimeError(f'unexpected edit plan: {plan}')
         else:
-            apply_local_edit(runtime, 1, 'S2', 'blue')
+            plan = apply_local_edit(runtime, 1, 'S2', 'blue')
         if policy == 'project_version':
             reject_old_project_work(runtime)
         runtime.close()
@@ -233,20 +234,35 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
         first_admission = None
         threshold = 3 if policy == 'videoflow_backoff3' else THRESHOLDS.get(policy)
         first_unknown_probe = {}
+        workflow_pair = None
+        if policy in WORKFLOW_POLICIES:
+            workflow_pair = dict(
+                provider=upstream.base, regenerate=sorted(plan['regenerate']),
+                initial_shots=sorted(original_ids), hidden_ack_shot='S4',
+                first_poll_tracked=None, first_poll_slots=None,
+                first_s4_probe_masked=None,
+            )
         with (root / 'worker.jsonl').open('w', encoding='utf-8') as log:
             while time.monotonic() - started < horizon:
                 # Match the simulator: capacity comes from the ledger at the
                 # start of the poll, including superseded unconfirmed jobs.
                 tracked_before = len(runtime.unresolved_remote())
                 capacity = max(0, recovery_cap - tracked_before)
+                if workflow_pair is not None and workflow_pair['first_poll_tracked'] is None:
+                    workflow_pair.update(first_poll_tracked=tracked_before, first_poll_slots=capacity)
                 backend.probed.clear()
                 backend.unknown_probed.clear()
                 probe_started = time.monotonic() - started
+                masked_before = transport.masked_polls
                 if policy == 'workflow_grace':
                     events = reconcile(polling, backend)
                 else:
                     events = pass_once(polling, backend, max_submit=0)
                 elapsed = time.monotonic() - started
+                target_probed = transport.target in backend.probed
+                target_probe_masked = transport.masked_polls > masked_before
+                if workflow_pair is not None and target_probed and workflow_pair['first_s4_probe_masked'] is None:
+                    workflow_pair['first_s4_probe_masked'] = target_probe_masked
                 if threshold is not None:
                     streaks = replace_blocking_shot(runtime, threshold, streaks, replacements, elapsed,
                                                     backend.probed)
@@ -278,7 +294,8 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
                 log.write(json.dumps(dict(elapsed=elapsed, events=events, tracked=len(unresolved),
                                           tracked_before=tracked_before, admitted=admitted,
                                           probe_started=probe_started,
-                                          target_probed=transport.target in backend.probed,
+                                          target_probed=target_probed, target_probe_masked=target_probe_masked,
+                                          available_slots=capacity,
                                           masked_polls=transport.masked_polls, upstream=observed)) + '\n')
                 log.flush()
                 if any(job['status'] == 'failed' for job in snapshot['jobs']) or 'failed' in observed.values():
@@ -310,6 +327,8 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
         accepted_by_shot = dict(Counter(info['shot'] for info in transport.accepted.values()))
         edited = runtime.db.execute('SELECT applied_at FROM vf_events WHERE revision=2').fetchone()[0]
         latency = ready - edited if ready is not None else None
+        if workflow_pair is not None and ready is not None and ready > edit_barrier_wall + horizon:
+            latency = None
         inspections = summarize_inspections(runtime)
         histories_by_job = {job['job']: job for job in inspections['jobs']}
         final_snapshot = runtime.snapshot()
@@ -349,6 +368,8 @@ def run_trial(root, upstream, policy, fault, poll, horizon, seed_offset,
             peak_tracked_unresolved=peak, masked_polls=transport.masked_polls,
             provider_history=inspections, provider_times=provider_times,
         )
+        if workflow_pair is not None:
+            result['workflow_pair'] = workflow_pair
         write_json(root / 'report.json', result)
         if stale or peak > maximum or not transport.masked_polls:
             raise RuntimeError(f'experiment invariant failed: {root}/report.json')
@@ -371,6 +392,7 @@ def main():
                                             'workflow', 'workflow_capacity'),
                         default='primary')
     parser.add_argument('--pilot', action='store_true', help='run the primary opaque cell or one workflow pilot pair')
+    parser.add_argument('--workflow-story', choices=('both', 'independent', 'ordered'), default='both')
     parser.add_argument('--workflow-mask-seconds', type=float, default=TRANSIENT_SECONDS)
     parser.add_argument('--workflow-grace-seconds', type=float, default=FIXED_GRACE_SECONDS)
     parser.add_argument('--workflow-fixed-poll', action='store_true')
@@ -389,10 +411,14 @@ def main():
         parser.error('--pilot requires primary or workflow and one repetition')
     if args.suite in ('backoff', 'grace', 'workflow', 'workflow_capacity') and (args.poll_seconds != 5 or args.horizon_seconds <= 30):
         parser.error('backoff, grace, and workflow suites require 5-second polls and a horizon above 30 seconds')
+    if args.workflow_story != 'both' and args.suite != 'workflow':
+        parser.error('--workflow-story requires the workflow suite')
     if args.pilot and args.suite == 'workflow':
-        cells = [('opaque', policy, CAPACITY, 'independent') for policy in WORKFLOW_POLICIES]
+        story = 'ordered' if args.workflow_story == 'ordered' else 'independent'
+        cells = [('opaque', policy, CAPACITY, story) for policy in WORKFLOW_POLICIES]
     elif args.suite in ('workflow', 'workflow_capacity'):
-        settings = ([(CAPACITY, 'independent'), (CAPACITY, 'ordered')] if args.suite == 'workflow'
+        stories = ('independent', 'ordered') if args.workflow_story == 'both' else (args.workflow_story,)
+        settings = ([(CAPACITY, story) for story in stories] if args.suite == 'workflow'
                     else [(2, 'independent'), (4, 'independent')])
         cells = [(fault, policy, cap, story) for cap, story in settings
                  for fault in WORKFLOW_FAULTS for policy in WORKFLOW_POLICIES]
@@ -429,7 +455,7 @@ def main():
     if args.suite in ('backoff', 'grace', 'workflow', 'workflow_capacity'):
         protocol.update(transient_mask_seconds=TRANSIENT_SECONDS, backoff_max_seconds=BACKOFF_MAX_SECONDS)
     if workflow_suite:
-        protocol.update(transient_mask_seconds=args.workflow_mask_seconds,
+        protocol.update(pair_boundary_audit=True, transient_mask_seconds=args.workflow_mask_seconds,
                         workflow_grace_seconds=args.workflow_grace_seconds,
                         workflow_polling='fixed' if args.workflow_fixed_poll else 'exponential',
                         audit_drain_seconds=args.workflow_drain_seconds,

@@ -39,6 +39,7 @@ def apply_local_edit(runtime, index, shot, color):
                              method='attr_dag', target=shot, key='color', value=color))
     if plan['regenerate'] != [shot]:
         raise RuntimeError(f'unexpected edit plan: {plan}')
+    return plan
 
 
 def prepare(root, backend, policy, trace):

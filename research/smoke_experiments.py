@@ -41,11 +41,18 @@ def smoke_workflow(root):
                     if fault == 'opaque':
                         assert row['replacements']['S4']['queued_after_seconds'] == 15
                     rows.append(dict(repetition=repetition, **row))
-    results = summarize(rows)
+    results = summarize(rows, require_boundary=True)
     for stratum in results:
         assert stratum['both_published'] == 3
         assert all(pair['publication_seconds_delta'] == 0 and pair['acceptances_delta'] == 0
                    for pair in stratum['pairs'])
+    mismatched = dict(rows[0], workflow_pair=dict(rows[0]['workflow_pair'], first_poll_slots=1))
+    try:
+        summarize([mismatched, rows[1]], require_boundary=True)
+    except ValueError as error:
+        assert 'mismatched workflow pair boundary' in str(error)
+    else:
+        raise AssertionError('mismatched capacity was accepted')
     censored = dict(rows[0], correct_publication_seconds=None)
     censor_summary = summarize([censored, rows[1]])[0]
     assert censor_summary['both_published'] == 0 and censor_summary['median_publication_seconds_delta'] is None
