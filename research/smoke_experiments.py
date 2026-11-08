@@ -14,6 +14,7 @@ from urllib import parse
 
 import recovery_observability_comfy as workflow
 import recovery_reference_comfy as reference
+import recovery_reference_fault_comfy as reference_fault
 from comfyui import ComfyUI
 from smoke_grace import Clock, Provider
 from summarize_workflow import summarize
@@ -157,7 +158,7 @@ def smoke_reference(root):
     server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    results = []
+    results, joint_results = [], []
     try:
         backend = ComfyUI(f'http://127.0.0.1:{server.server_port}', timeout=5)
         for story in reference.CHAINS:
@@ -177,11 +178,33 @@ def smoke_reference(root):
                 results.append({key: report[key] for key in (
                     'story', 'method', 'manifest_revisions', 'changed_reference_frame_edges',
                     'stale_result_rejected', 'independent_reused', 'submission_intents')})
+        for fault in reference_fault.FAULTS:
+            for method in reference_fault.POLICIES:
+                jobs.clear()
+                report = reference_fault.run_trial(
+                    root / f'{fault}-{method}', backend, method, fault, 3107,
+                    cap=2, poll=0.01, grace=0.025, obsolete_mask=0.04, setup_timeout=25,
+                    horizon=25, drain=1)
+                assert report['correct_by_deadline'] and report['obsolete_result_rejected']
+                assert report['s4_reserved_after_selected_s2_commit']
+                assert report['manifest_revisions'] == [1, 3]
+                assert report['independent_reused'] == (method != 'project_version_grace')
+                assert set(report['provider_outcomes'].values()) == {'succeeded'}
+                replacement = fault == 'joint_opaque'
+                assert report['submission_intents'] == 11 + (method == 'project_version_grace') + replacement
+                assert set(report['local_replacements']) == ({'S2'} if replacement else set())
+                assert report['repeated_acceptances_same_workflow'] == (method == 'project_version_grace') + replacement
+                bound = {(r['parent'], r['child']): r for r in report['references'][3:]}
+                assert bound['S1', 'S2']['frame_sha256'] == bound['S1', 'S3']['frame_sha256']
+                assert bound['S2', 'S4']['parent_revision'] == (4 if replacement else 3)
+                joint_results.append({key: report[key] for key in (
+                    'policy', 'fault', 'manifest_revisions', 'obsolete_result_rejected',
+                    'independent_reused', 'submission_intents', 'repeated_acceptances_same_workflow')})
     finally:
         server.shutdown()
         server.server_close()
         thread.join()
-    return dict(evidence='synthetic_comfyui_http_fixture_no_gpu', trials=len(results), cases=results)
+    return dict(evidence='synthetic_comfyui_http_fixture_no_gpu', trials=len(results), cases=results, joint_cases=joint_results)
 
 
 def main():
@@ -192,7 +215,7 @@ def main():
         references.mkdir()
         report = dict(workflow=smoke_workflow(recovery), references=smoke_reference(references))
     Path(sys.argv[1]).write_text(json.dumps(report, indent=2) + '\n')
-    print('50 deterministic workflow trials, six synthetic reference trials, and one censor check passed.')
+    print('50 deterministic workflow trials, six synthetic reference trials, six joint reference-fault trials, and one censor check passed.')
 
 
 if __name__ == '__main__':

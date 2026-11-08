@@ -103,8 +103,7 @@ class ReferenceFrames:
         return workflow
 
 
-def run_trial(root, backend, story, method, seed, cap, poll, horizon, supersede):
-    root.mkdir()
+def check_backend(backend):
     queue = backend._request('/queue')
     if any(queue.get(key) for key in ('queue_running', 'queue_pending')):
         raise RuntimeError('use a dedicated idle ComfyUI queue')
@@ -114,16 +113,45 @@ def run_trial(root, backend, story, method, seed, cap, poll, horizon, supersede)
             or 'LoadImage' not in image_node):
         raise RuntimeError('ComfyUI must expose H3 first_frame and LoadImage inputs')
 
-    refs = ReferenceFrames(root / 'references', backend)
+
+def initialize_reference_project(runtime, story, seed):
     edges = [dict(parent=a, child=b, kind='reference') for a, b in CHAINS[story]]
+    runtime.initialize(dict(assets=[
+        dict(id=shot, scene=shot, kind='video',
+             spec=dict(template=prompt, values={'color': 'white'} if shot == 'S1' else {},
+                       reads=['color'] if shot == 'S1' else [], cost=1,
+                       config={'seed': seed + index}))
+        for index, (shot, prompt) in enumerate(PROMPTS.items())], edges=edges))
+
+
+def reference_evidence(manifests, jobs, refs, edges):
+    evidence = []
+    for manifest in manifests:
+        for parent, child in edges:
+            upstream, downstream = manifest[parent], manifest[child]
+            job = jobs[(child, downstream['revision'])]
+            dep, = json.loads(job['input_json'])['dependencies']
+            workflow = json.loads(job['execution_json'])
+            stage = refs.staged[upstream['output']]
+            if (dep['asset'], dep['revision'], dep['input_hash'], dep['output']) != (
+                    parent, upstream['revision'], upstream['input_hash'], upstream['output']):
+                raise RuntimeError(f'{child} did not consume the committed {parent} revision')
+            if (stage['source_video_sha256'] != upstream['sha256']
+                    or workflow['15']['inputs']['image'] != stage['provider_image']
+                    or workflow['5']['inputs']['first_frame'] != ['15', 0]):
+                raise RuntimeError(f'{child} did not bind the verified upstream frame')
+            evidence.append(dict(parent=parent, child=child, parent_revision=dep['revision'],
+                                 child_revision=downstream['revision'], **stage))
+    return evidence
+
+
+def run_trial(root, backend, story, method, seed, cap, poll, horizon, supersede):
+    root.mkdir()
+    check_backend(backend)
+    refs = ReferenceFrames(root / 'references', backend)
     runtime = AssetRuntime(str(root / 'project.db'))
     try:
-        runtime.initialize(dict(assets=[
-            dict(id=shot, scene=shot, kind='video',
-                 spec=dict(template=prompt, values={'color': 'white'} if shot == 'S1' else {},
-                           reads=['color'] if shot == 'S1' else [], cost=1,
-                           config={'seed': seed + index}))
-            for index, (shot, prompt) in enumerate(PROMPTS.items())], edges=edges))
+        initialize_reference_project(runtime, story, seed)
         capture_environment(runtime, backend)
 
         def step(submission_limit=cap):
@@ -180,23 +208,7 @@ def run_trial(root, backend, story, method, seed, cap, poll, horizon, supersede)
         if independent_reused != (method != 'full'):
             raise RuntimeError('independent shot reuse disagrees with the declared method')
         jobs = {(job['asset'], job['revision']): job for job in snapshot['jobs']}
-        evidence = []
-        for manifest in (initial, final):
-            for parent, child in CHAINS[story]:
-                upstream, downstream = manifest[parent], manifest[child]
-                job = jobs[(child, downstream['revision'])]
-                dep, = json.loads(job['input_json'])['dependencies']
-                workflow = json.loads(job['execution_json'])
-                stage = refs.staged[upstream['output']]
-                if (dep['asset'], dep['revision'], dep['input_hash'], dep['output']) != (
-                        parent, upstream['revision'], upstream['input_hash'], upstream['output']):
-                    raise RuntimeError(f'{child} did not consume the committed {parent} revision')
-                if (stage['source_video_sha256'] != upstream['sha256']
-                        or workflow['15']['inputs']['image'] != stage['provider_image']
-                        or workflow['5']['inputs']['first_frame'] != ['15', 0]):
-                    raise RuntimeError(f'{child} did not bind the verified upstream frame')
-                evidence.append(dict(parent=parent, child=child, parent_revision=dep['revision'],
-                                     child_revision=downstream['revision'], **stage))
+        evidence = reference_evidence((initial, final), jobs, refs, CHAINS[story])
         published_revisions = [row[0] for row in runtime.db.execute(
             'SELECT revision FROM vf_timelines ORDER BY revision')]
         stale_rejected = None
