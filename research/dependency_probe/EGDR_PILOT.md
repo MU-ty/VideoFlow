@@ -44,3 +44,51 @@ python research/dependency_probe/egdr.py \
 `--checklist-recall` 保留原 Checklist 的选择，只复核闭包之外的镜头。对象实例、具体部件或动作、可见性、编辑范围四项均有本镜头文字引文且判为正向时，才新增失效种子。随后沿已有硬依赖传播。输出分别记录复核新增镜头、由依赖传播新增的镜头、逐项证据、原始回复和额外模型调用数。同一次运行也输出 Direct 与 Checklist 的并集，作为直接复用两者结果的简单对照。
 
 先用自行车与咖啡车的四条旧编辑诊断 B1-S1 漏选。这四条曾用于定位问题，应视为开发数据。后续评测使用新故事的编辑前视频，先独立记录帧观察，再冻结编辑、保留的依赖、受影响镜头标注及方法版本。至少包括跨镜头同实体、同类不同实例、不可见部件和零受影响镜头的编辑，并报告每个故事的错误与调用数。比较纯文本与加入帧观察笔记两个输入条件。主要检验是复核相对于 Checklist 是否减少漏选、相对于 Direct 与 Checklist 并集是否在相同漏选数下减少多选，并单独报告能否在零漏选时减少全量重生成。镜头数是代理成本，帧观察笔记是文字证据，模型调用数应独立汇报。
+
+## 新故事的关键帧视觉评测
+
+`vision_probe.py` 只读取编辑前的镜头。每段视频固定在 10%、35%、60%、85% 四个时间点采样，按时间顺序排成 2×2 图。视觉模型收到编辑指令和本镜头的图，输出是否可见、对应格子和视觉依据。模型也可以明确回答未知。模型的依据用于复核，图像中是否确实存在该部件由人工标注判定。
+
+预先固定三个评测方法：
+
+| 方法 | 选择规则 |
+| --- | --- |
+| `checklist_union` | 用同一个文本模型跑纯文本与文本＋独立帧观察笔记，合并两组选择 |
+| `vision` | 选入视觉模型判断为 `yes` 的镜头 |
+| `union_plus_vision` | 用视觉模型的 `yes` 补选 Checklist 并集 |
+
+所有方法都保留已声明的失效镜头及其硬依赖闭包。视觉模型不接收人工帧笔记或标注。模型说未知时不新增种子，输出单列未知及调用数。报告按镜头和故事列出漏选、多选和相对并集的差值。不同模型的结果属于方法级对照；同时报告两种输入单独跑 Checklist 的结果。若总漏选数相同，比较多选数并检查是否漏在同一镜头；若漏选减少，明确报告增加的多选。旧故事只用于验证管道。
+
+正式跑分前，从至少两个未用于依赖探测的故事选取编辑前镜头。人工帧观察笔记先按固定四帧独立记录，不看编辑指令。再冻结编辑、已声明依赖和正确受影响镜头集合，包含同类但不同实例、同一实例跨镜头、部件遮挡或画外的案例。有分歧的标注先解决并记录。以下是输入结构示例，其中镜头与标注均为占位：
+
+```json
+[
+  {
+    "id": "edit01",
+    "story": "new_story",
+    "entity": "buckle",
+    "attribute": "color",
+    "edit": "Recolor only the front buckle of the blue bag to silver.",
+    "shots": {
+      "S1": "Wide shot. Frame observation: The blue bag front faces the camera with a black buckle.",
+      "S2": "Rear view. Frame observation: Only the back panel is visible."
+    },
+    "clips": {"S1": "clips/S1.mp4", "S2": "clips/S2.mp4"},
+    "declared": [],
+    "gold": ["S1"]
+  }
+]
+```
+
+`clips` 相对评测 JSON 所在目录。同一故事的不同编辑应复用同一组原始镜头。可以用已有 EGDR 格式的 `edges` 和 `costs` 字段声明已知硬依赖和镜头权重。默认成本单位为镜头数。
+
+```bash
+python research/dependency_probe/vision_probe.py --cases new_stories.json \
+  --output runs/vision-frame-check --prepare-only
+
+ollama pull qwen2.5vl:7b
+python -u research/dependency_probe/vision_probe.py --cases new_stories.json \
+  --output runs/vision-paired-01 --server http://127.0.0.1:11434
+```
+
+两次命令使用不同的新输出目录。正式运行在 `report.json` 保存汇总，在 `responses.jsonl` 保存逐条原始回复，在 `protocol.json` 保存输入哈希、模型标签和采样时间。
