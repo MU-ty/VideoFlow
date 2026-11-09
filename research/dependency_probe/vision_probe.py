@@ -27,6 +27,10 @@ VISUAL_INSTRUCTIONS = (
     'Return JSON with keys decision (yes, no, unknown), panel (1 to 4 for yes, null otherwise), '
     'and evidence (a short description of the original-frame evidence).\n'
 )
+VISIBILITY_OUTPUT = (
+    'Return JSON with decision (yes, no, or unknown), panel (1–4 for yes, '
+    'null otherwise), and a short evidence description.'
+)
 
 
 def load_cases(path):
@@ -90,8 +94,11 @@ def make_sheet(clip, sheet):
                 sheet_sha256=sha256(sheet.read_bytes()).hexdigest())
 
 
-def visual_reply(server, model, edit, sheet):
-    prompt = VISUAL_INSTRUCTIONS + json.dumps({'edit': edit}, ensure_ascii=False)
+def visual_reply(server, model, edit, sheet, *, visibility_question=None):
+    if visibility_question is None:
+        prompt = VISUAL_INSTRUCTIONS + json.dumps({'edit': edit}, ensure_ascii=False)
+    else:
+        prompt = visibility_question + ' ' + VISIBILITY_OUTPUT
     request = Request(server.rstrip('/') + '/api/chat', data=json.dumps({
         'model': model, 'stream': False, 'format': 'json',
         'options': {'temperature': 0, 'seed': 42, 'num_predict': 384},
@@ -104,6 +111,8 @@ def visual_reply(server, model, edit, sheet):
 
 def parse_visual(raw):
     answer = json.loads(raw)
+    if isinstance(answer, dict) and 'evidence' not in answer and 'evidence_description' in answer:
+        answer['evidence'] = answer['evidence_description']
     if (not isinstance(answer, dict) or answer.get('decision') not in ('yes', 'no', 'unknown')
             or not isinstance(answer.get('evidence'), str) or 'panel' not in answer):
         raise ValueError('invalid visual reply')
@@ -116,7 +125,7 @@ def parse_visual(raw):
     return answer
 
 
-def run_case(case, sheets, server, text_model, vision_model, log):
+def run_case(case, sheets, server, text_model, vision_model, log, *, visibility_question=None):
     public = planning_input(case)
     declared = close_selection(public, set())
     methods = {'attr_dag': declared, 'full': set(case['shots'])}
@@ -136,7 +145,8 @@ def run_case(case, sheets, server, text_model, vision_model, log):
     positives = set()
     unknown = []
     for shot in sorted(set(case['shots']) - declared):
-        raw = visual_reply(server, vision_model, case['edit'], sheets[shot])
+        raw = visual_reply(server, vision_model, case['edit'], sheets[shot],
+                           visibility_question=visibility_question)
         log(dict(case=case['id'], method='vision', shot=shot, raw=raw))
         reply = parse_visual(raw)
         if reply['decision'] == 'yes':
@@ -162,8 +172,16 @@ def main():
     parser.add_argument('--server', default='http://127.0.0.1:11434')
     parser.add_argument('--text-model', default='qwen2.5:14b')
     parser.add_argument('--vision-model', default='qwen2.5vl:7b')
+    parser.add_argument('--visibility-questions', type=Path,
+                        help='JSON mapping each case ID to a source-only visual question')
     args = parser.parse_args()
     cases = load_cases(args.cases)
+    questions = {}
+    if args.visibility_questions is not None:
+        questions = json.loads(args.visibility_questions.read_text(encoding='utf-8'))
+        if (not isinstance(questions, dict) or set(questions) != {case['id'] for case in cases}
+                or not all(isinstance(question, str) and question.strip() for question in questions.values())):
+            parser.error('--visibility-questions must contain one nonempty question per case ID')
     args.output.mkdir(parents=True)
     sheets, frames = {}, {}
     for case in cases:
@@ -176,7 +194,9 @@ def main():
                              for shot, clip in case['clips'].items()}
     protocol = dict(dataset=args.cases.name, dataset_sha256=sha256(args.cases.read_bytes()).hexdigest(),
                     frame_fractions=FRACTIONS, frames=frames, text_model=args.text_model,
-                    vision_model=args.vision_model, visual_instructions=VISUAL_INSTRUCTIONS,
+                    vision_model=args.vision_model,
+                    visual_instructions=VISIBILITY_OUTPUT if questions else VISUAL_INSTRUCTIONS,
+                    visibility_questions=questions,
                     prepare_only=args.prepare_only)
     (args.output / 'protocol.json').write_text(json.dumps(protocol, indent=2) + '\n', encoding='utf-8')
     if args.prepare_only:
@@ -190,7 +210,7 @@ def main():
         for case in cases:
             print(f"{case['story']}/{case['id']}", flush=True)
             rows.append(run_case(case, sheets[case['story']], args.server, args.text_model,
-                                 args.vision_model, log))
+                                 args.vision_model, log, visibility_question=questions.get(case['id'])))
     totals = summarize(rows)
     by_story = {story: summarize([row for row in rows if row['story'] == story]) for story in sheets}
     union = totals['checklist_union']

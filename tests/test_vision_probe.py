@@ -1,4 +1,5 @@
 """Regression checks for visual decisions and the frozen paired baseline."""
+import io
 import json
 from pathlib import Path
 import sys
@@ -6,10 +7,21 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'research/dependency_probe'))
-from vision_probe import parse_visual, run_case
+from vision_probe import parse_visual, run_case, visual_reply
 
 
 class VisionProbeTest(unittest.TestCase):
+    def test_source_question_omits_edit_and_accepts_observed_evidence_key(self):
+        reply = '{"decision":"yes","panel":1,"evidence_description":"visible buckle"}'
+        response = io.BytesIO(json.dumps({'message': {'content': reply}}).encode())
+        with patch('vision_probe.urlopen', return_value=response) as open_url:
+            result = visual_reply('http://localhost', 'vision-model', 'Recolor the buckle orange',
+                                  Path(__file__), visibility_question='Is the yellow buckle visible?')
+        message, = json.loads(open_url.call_args.args[0].data)['messages']
+        self.assertTrue(message['content'].startswith('Is the yellow buckle visible?'))
+        self.assertNotIn('orange', message['content'])
+        self.assertEqual(parse_visual(result)['evidence'], 'visible buckle')
+
     def test_positive_requires_valid_panel_and_evidence(self):
         self.assertEqual(parse_visual('{"decision":"yes","panel":4,"evidence":"visible buckle"}')
                          ['decision'], 'yes')
