@@ -13,6 +13,20 @@ from ollama_probe import predict
 
 FRACTIONS = (0.10, 0.35, 0.60, 0.85)
 ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_-]*')
+VISUAL_INSTRUCTIONS = (
+    'All four panels show the same shot BEFORE any edit. Answer a visibility question about '
+    'those original frames: is the exact object instance and part, action or relation named '
+    'as the edit target visible in at least one panel? The edit is a future instruction. '
+    'Do not look for the requested outcome or decide whether the edit already happened. '
+    'For example, if the instruction is to turn a green cap orange, seeing that green cap '
+    'on the specified object is sufficient for yes. Seeing a similar cap on another object '
+    'is not a match. Excluded objects can coexist in the shot. '
+    'Answer no if the target is absent, off-screen or occluded in all four panels. '
+    'Use unknown only if the frames are unreadable or a visible candidate cannot be identified. '
+    'Panels are numbered 1 top left, 2 top right, 3 bottom left, 4 bottom right. '
+    'Return JSON with keys decision (yes, no, unknown), panel (1 to 4 for yes, null otherwise), '
+    'and evidence (a short description of the original-frame evidence).\n'
+)
 
 
 def load_cases(path):
@@ -77,17 +91,7 @@ def make_sheet(clip, sheet):
 
 
 def visual_reply(server, model, edit, sheet):
-    prompt = (
-        'Should this shot be regenerated to satisfy the user edit? Judge the original shot '
-        'only from the four ordered frames in the image: 1 top left, 2 top right, 3 bottom left, '
-        '4 bottom right. Answer yes if any frame visibly depicts the exact object instance '
-        'and the specific edited part, action or relation, within the edit scope. '
-        'Similar objects and other parts are insufficient. Objects to leave unchanged may '
-        'still appear in the same shot. If the evidence cannot establish the answer, use unknown. '
-        'Return JSON with keys decision (yes, no, unknown), panel (1 to 4 for yes, null otherwise), '
-        'and evidence (short description of what is visible). The edit is the task description.\n'
-        + json.dumps({'edit': edit}, ensure_ascii=False)
-    )
+    prompt = VISUAL_INSTRUCTIONS + json.dumps({'edit': edit}, ensure_ascii=False)
     request = Request(server.rstrip('/') + '/api/chat', data=json.dumps({
         'model': model, 'stream': False, 'format': 'json',
         'options': {'temperature': 0, 'seed': 42, 'num_predict': 384},
@@ -172,7 +176,8 @@ def main():
                              for shot, clip in case['clips'].items()}
     protocol = dict(dataset=args.cases.name, dataset_sha256=sha256(args.cases.read_bytes()).hexdigest(),
                     frame_fractions=FRACTIONS, frames=frames, text_model=args.text_model,
-                    vision_model=args.vision_model, prepare_only=args.prepare_only)
+                    vision_model=args.vision_model, visual_instructions=VISUAL_INSTRUCTIONS,
+                    prepare_only=args.prepare_only)
     (args.output / 'protocol.json').write_text(json.dumps(protocol, indent=2) + '\n', encoding='utf-8')
     if args.prepare_only:
         return
