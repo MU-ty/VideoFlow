@@ -154,6 +154,8 @@ class AssetRuntime:
             if event['target'] not in specs or event['key'] not in specs[event['target']]['reads']:
                 raise ValueError('edit must target a declared input attribute')
             edges = json.loads(project['edges'])
+            repairs = self._state_repairs(event, assets, specs, edges)
+            edges.extend(repairs)
             story = {'scenes':[dict(id=a['id'], cost=specs[a['id']]['cost'], reads=specs[a['id']]['reads']) for a in assets], 'edges':edges}
             p = execution_plan(story, event, event.get('method','dair'))
             selected = set(p.regenerate)
@@ -183,11 +185,47 @@ class AssetRuntime:
                 self.db.execute("UPDATE vf_jobs SET status='superseded' WHERE asset=? AND status IN ('pending','submitting','submitted','unknown')", (a['id'],))
                 self.db.execute('UPDATE vf_assets SET spec=?, revision=revision+1, output=NULL, committed_hash=NULL WHERE id=?', (encode(spec), a['id']))
                 self._job(a['id'], a['revision']+1)
-            self.db.execute('UPDATE vf_project SET revision=? WHERE id=1', (revision,))
+            self.db.execute('UPDATE vf_project SET revision=?,edges=? WHERE id=1', (revision, encode(edges)))
             result = json.loads(encode(dict(asdict(p), revision=revision, state_changed=sorted(state_changed))))
+            if repairs:
+                result['state_repairs'] = repairs
             self.db.execute('INSERT INTO vf_events(id,payload,revision,plan,applied_at) VALUES (?,?,?,?,?)', (event['id'], payload, revision, encode(result), time.time()))
             self._publish()
             return result
+
+    def _state_repairs(self, event, assets, specs, edges):
+        """Bind new state edges to the current artifact observed by the caller."""
+        requests = event.get('state_repairs', [])
+        if not isinstance(requests, list):
+            raise ValueError('state_repairs must be a list')
+        by_id = {asset['id']: asset for asset in assets}
+        parent, key = event['target'], event['key']
+        if requests and by_id[parent]['kind'] != 'video':
+            raise ValueError('state repairs require a video edit target')
+        seen, repairs = set(), []
+        for request in requests:
+            if (not isinstance(request, dict)
+                    or set(request) != {'child', 'source_input_hash', 'evidence_sha256'}
+                    or not isinstance(request['child'], str)
+                    or any(not isinstance(request[field], str) or not re.fullmatch(r'[a-f0-9]{64}', request[field])
+                           for field in ('source_input_hash', 'evidence_sha256'))):
+                raise ValueError('invalid state repair evidence record')
+            child = request['child']
+            if (child in seen or child not in by_id or by_id[child]['kind'] != 'video'
+                    or by_id[parent]['position'] >= by_id[child]['position']):
+                raise ValueError('state repairs require unique, downstream video consumers')
+            seen.add(child)
+            if (by_id[child]['output'] is None
+                    or by_id[child]['committed_hash'] != request['source_input_hash']):
+                raise Conflict('state repair evidence refers to a noncurrent source artifact')
+            if (key not in specs[child]['reads']
+                    or specs[child]['values'][key] != specs[parent]['values'][key]):
+                raise Conflict('state repair requires a compatible, declared input binding')
+            if any(e['kind'] == 'state' and e['parent'] == parent and e['child'] == child
+                   and key in e['keys'] for e in edges):
+                continue
+            repairs.append(dict(parent=parent, child=child, kind='state', keys=[key]))
+        return repairs
 
     def _inputs(self, aid):
         a = self.db.execute('SELECT * FROM vf_assets WHERE id=?', (aid,)).fetchone()

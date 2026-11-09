@@ -182,8 +182,8 @@ def parse_verification(raw):
     return matched
 
 
-def run_case(case, sheets, server, text_model, vision_model, log, *,
-             visibility_question=None, verify_visual=False):
+def collect_selections(case, sheets, server, text_model, vision_model, log, *,
+                       visibility_question=None, verify_visual=False):
     public = planning_input(case)
     declared = close_selection(public, set())
     methods = {'attr_dag': declared, 'full': set(case['shots'])}
@@ -222,7 +222,7 @@ def run_case(case, sheets, server, text_model, vision_model, log, *,
             positives.add(shot)
         elif reply['decision'] == 'unknown':
             unknown.append(shot)
-    verified, verification_invalid = set(), []
+    verified, verification_invalid, verification_unknown = set(), [], []
     if verify_visual:
         prompt = VERIFY_INSTRUCTIONS + visibility_question
         for shot in sorted(positives):
@@ -235,22 +235,34 @@ def run_case(case, sheets, server, text_model, vision_model, log, *,
                 continue
             if matched:
                 verified.add(shot)
+            else:
+                verdict = json.loads(raw)
+                if all(verdict[key] != 'no' for key in VERIFY_CHECKS):
+                    verification_unknown.append(shot)
     if not invalid:
         methods['vision'] = close_selection(public, positives)
         methods['union_plus_vision'] = close_selection(public, union | positives)
         if verify_visual and not verification_invalid:
             methods['vision_verified'] = close_selection(public, verified)
             methods['union_plus_verified'] = close_selection(public, union | verified)
+    return methods, dict(visual_positives=sorted(positives), visual_unknown=unknown,
+                         visual_retries=retries, visual_invalid=invalid,
+                         vision_calls=len(case['shots']) - len(declared) + len(retries),
+                         verified_positives=sorted(verified), verification_invalid=verification_invalid,
+                         verification_unknown=verification_unknown,
+                         verification_calls=len(positives) if verify_visual else 0)
+
+
+def run_case(case, sheets, server, text_model, vision_model, log, *,
+             visibility_question=None, verify_visual=False):
+    methods, audit = collect_selections(case, sheets, server, text_model, vision_model, log,
+                                        visibility_question=visibility_question,
+                                        verify_visual=verify_visual)
     gold, costs = set(case['gold']), case.get('costs', {})
     results = [dict(method=method, selected=sorted(selected), missed=sorted(gold - selected),
                     excess=sorted(selected - gold), cost=sum(costs.get(s, 1) for s in selected))
                for method, selected in methods.items()]
-    return dict(case=case['id'], story=case['story'], gold=sorted(gold), results=results,
-                visual_positives=sorted(positives), visual_unknown=unknown,
-                visual_retries=retries, visual_invalid=invalid,
-                vision_calls=len(case['shots']) - len(declared) + len(retries),
-                verified_positives=sorted(verified), verification_invalid=verification_invalid,
-                verification_calls=len(positives) if verify_visual else 0)
+    return dict(case=case['id'], story=case['story'], gold=sorted(gold), results=results, **audit)
 
 
 def main():
