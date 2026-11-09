@@ -11,6 +11,30 @@ from vision_probe import parse_visual, run_case, visual_reply
 
 
 class VisionProbeTest(unittest.TestCase):
+    def test_visual_verification_requires_all_checks_and_preserves_raw_baseline(self):
+        case = dict(id='edit', story='story', entity='dial', attribute='color',
+                    edit='Recolor the dial', shots={'S1': 'dial', 'S2': 'handwheel'},
+                    declared=[], gold=['S1'])
+        sheets = {shot: Path(f'{shot}.jpg') for shot in case['shots']}
+        positive = '{"decision":"yes","panel":1,"evidence":"round object"}'
+        accepted = '{"identity":"yes","part":"yes","position":"yes","panel":1,"evidence":"marked front dial"}'
+        rejected = '{"identity":"yes","part":"unknown","position":"no","panel":null,"evidence":"side wheel"}'
+        logs = []
+        with patch('vision_probe.predict', return_value=([], '{}')), \
+             patch('vision_probe.visual_reply', return_value=positive), \
+             patch('vision_probe.image_reply', side_effect=[accepted, rejected]) as verify:
+            report = run_case(case, sheets, 'server', 'text-model', 'vision-model', logs.append,
+                              visibility_question='Is the front dial visible?', verify_visual=True)
+        methods = {row['method']: row for row in report['results']}
+        self.assertEqual(methods['vision']['selected'], ['S1', 'S2'])
+        self.assertEqual(methods['vision_verified']['selected'], ['S1'])
+        self.assertEqual(methods['union_plus_verified']['selected'], ['S1'])
+        self.assertEqual(report['verification_calls'], 2)
+        self.assertEqual([log['raw'] for log in logs if log['method'] == 'vision_verify'],
+                         [accepted, rejected])
+        self.assertTrue(all(call.args[3].endswith('Is the front dial visible?')
+                            for call in verify.call_args_list))
+
     def test_retries_invalid_visual_reply_without_scoring_persistent_format_errors(self):
         case = dict(id='edit', story='story', entity='buckle', attribute='color',
                     edit='Recolor the buckle', shots={'S1': 'strap', 'S2': 'tool'},

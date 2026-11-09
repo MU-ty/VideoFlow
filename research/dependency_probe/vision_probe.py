@@ -41,6 +41,28 @@ VISUAL_RETRY_SCHEMA = {
         'evidence': {'type': 'string'},
     },
 }
+VERIFY_CHECKS = ('identity', 'part', 'position')
+VERIFY_INSTRUCTIONS = (
+    'Independently inspect the four original panels for the target in the question. '
+    'Check identity: the part belongs to the specified object instance. Check part: '
+    'the visible shape, appearance and function match the named part. Check position: '
+    'the part is in the specified location or relation. A similar part, a different '
+    'object, or an unsupported location is insufficient. Follow any crop allowances '
+    'explicitly stated in the question. Do not combine different panels to make a match. '
+    'Answer yes, no, or unknown for each check. To answer yes for all three, cite a single '
+    'panel (1 top left, 2 top right, 3 bottom left, 4 bottom right) and describe concrete '
+    'visual evidence in it. Use null if no panel supports all three checks.\n'
+)
+VERIFY_SCHEMA = {
+    'type': 'object',
+    'required': [*VERIFY_CHECKS, 'panel', 'evidence'],
+    'additionalProperties': False,
+    'properties': {
+        **{check: {'enum': ['yes', 'no', 'unknown']} for check in VERIFY_CHECKS},
+        'panel': {'enum': [None, 1, 2, 3, 4]},
+        'evidence': {'type': 'string'},
+    },
+}
 
 
 def load_cases(path):
@@ -115,8 +137,12 @@ def visual_reply(server, model, edit, sheet, *, visibility_question=None, format
             'panel from 1 to 4 and describe the visible evidence from that panel. If you cannot '
             'identify the panel and evidence, use unknown. For no or unknown, use a null panel.'
         )
+    return image_reply(server, model, sheet, prompt, VISUAL_RETRY_SCHEMA if format_retry else 'json')
+
+
+def image_reply(server, model, sheet, prompt, response_format):
     request = Request(server.rstrip('/') + '/api/chat', data=json.dumps({
-        'model': model, 'stream': False, 'format': VISUAL_RETRY_SCHEMA if format_retry else 'json',
+        'model': model, 'stream': False, 'format': response_format,
         'options': {'temperature': 0, 'seed': 42, 'num_predict': 384},
         'messages': [{'role': 'user', 'content': prompt,
                       'images': [base64.b64encode(sheet.read_bytes()).decode('ascii')]}],
@@ -141,7 +167,23 @@ def parse_visual(raw):
     return answer
 
 
-def run_case(case, sheets, server, text_model, vision_model, log, *, visibility_question=None):
+def parse_verification(raw):
+    answer = json.loads(raw)
+    if (not isinstance(answer, dict)
+            or any(answer.get(key) not in ('yes', 'no', 'unknown') for key in VERIFY_CHECKS)
+            or not isinstance(answer.get('evidence'), str) or 'panel' not in answer):
+        raise ValueError('invalid verification reply')
+    panel = answer['panel']
+    if panel is not None and (type(panel) is not int or not 1 <= panel <= len(FRACTIONS)):
+        raise ValueError('invalid verification panel')
+    matched = all(answer[key] == 'yes' for key in VERIFY_CHECKS)
+    if matched and (panel is None or not answer['evidence'].strip()):
+        raise ValueError('verification match requires a panel and visible evidence')
+    return matched
+
+
+def run_case(case, sheets, server, text_model, vision_model, log, *,
+             visibility_question=None, verify_visual=False):
     public = planning_input(case)
     declared = close_selection(public, set())
     methods = {'attr_dag': declared, 'full': set(case['shots'])}
@@ -180,9 +222,25 @@ def run_case(case, sheets, server, text_model, vision_model, log, *, visibility_
             positives.add(shot)
         elif reply['decision'] == 'unknown':
             unknown.append(shot)
+    verified, verification_invalid = set(), []
+    if verify_visual:
+        prompt = VERIFY_INSTRUCTIONS + visibility_question
+        for shot in sorted(positives):
+            raw = image_reply(server, vision_model, sheets[shot], prompt, VERIFY_SCHEMA)
+            log(dict(case=case['id'], method='vision_verify', shot=shot, raw=raw))
+            try:
+                matched = parse_verification(raw)
+            except ValueError:
+                verification_invalid.append(shot)
+                continue
+            if matched:
+                verified.add(shot)
     if not invalid:
         methods['vision'] = close_selection(public, positives)
         methods['union_plus_vision'] = close_selection(public, union | positives)
+        if verify_visual and not verification_invalid:
+            methods['vision_verified'] = close_selection(public, verified)
+            methods['union_plus_verified'] = close_selection(public, union | verified)
     gold, costs = set(case['gold']), case.get('costs', {})
     results = [dict(method=method, selected=sorted(selected), missed=sorted(gold - selected),
                     excess=sorted(selected - gold), cost=sum(costs.get(s, 1) for s in selected))
@@ -190,7 +248,9 @@ def run_case(case, sheets, server, text_model, vision_model, log, *, visibility_
     return dict(case=case['id'], story=case['story'], gold=sorted(gold), results=results,
                 visual_positives=sorted(positives), visual_unknown=unknown,
                 visual_retries=retries, visual_invalid=invalid,
-                vision_calls=len(case['shots']) - len(declared) + len(retries))
+                vision_calls=len(case['shots']) - len(declared) + len(retries),
+                verified_positives=sorted(verified), verification_invalid=verification_invalid,
+                verification_calls=len(positives) if verify_visual else 0)
 
 
 def main():
@@ -203,7 +263,11 @@ def main():
     parser.add_argument('--vision-model', default='qwen2.5vl:7b')
     parser.add_argument('--visibility-questions', type=Path,
                         help='JSON mapping each case ID to a source-only visual question')
+    parser.add_argument('--verify-visual', action='store_true',
+                        help='check identity, part, and position for each visual positive')
     args = parser.parse_args()
+    if args.verify_visual and args.visibility_questions is None:
+        parser.error('--verify-visual requires --visibility-questions')
     cases = load_cases(args.cases)
     questions = {}
     if args.visibility_questions is not None:
@@ -227,6 +291,7 @@ def main():
                     visual_instructions=VISIBILITY_OUTPUT if questions else VISUAL_INSTRUCTIONS,
                     visibility_questions=questions,
                     visual_format_retry_limit=1,
+                    visual_verification_instructions=VERIFY_INSTRUCTIONS if args.verify_visual else None,
                     prepare_only=args.prepare_only)
     (args.output / 'protocol.json').write_text(json.dumps(protocol, indent=2) + '\n', encoding='utf-8')
     if args.prepare_only:
@@ -240,24 +305,35 @@ def main():
         for case in cases:
             print(f"{case['story']}/{case['id']}", flush=True)
             rows.append(run_case(case, sheets[case['story']], args.server, args.text_model,
-                                 args.vision_model, log, visibility_question=questions.get(case['id'])))
+                                 args.vision_model, log, visibility_question=questions.get(case['id']),
+                                 verify_visual=args.verify_visual))
     invalid = {row['case']: row['visual_invalid'] for row in rows if row['visual_invalid']}
-    visual_methods = ('vision', 'union_plus_vision')
+    verification_invalid = {row['case']: row['verification_invalid'] for row in rows
+                            if row['verification_invalid']}
+    visual_methods = ['vision', 'union_plus_vision']
+    if args.verify_visual:
+        visual_methods.extend(('vision_verified', 'union_plus_verified'))
     totals = summarize(rows)
     by_story = {story: summarize([row for row in rows if row['story'] == story]) for story in sheets}
     union = totals['checklist_union']
+    blocked = visual_methods if invalid else (
+        ('vision_verified', 'union_plus_verified') if verification_invalid else ()
+    )
+    for counts in (totals, *by_story.values()):
+        for method in blocked:
+            counts.pop(method, None)
     if invalid:
-        for counts in (totals, *by_story.values()):
-            for method in visual_methods:
-                counts.pop(method, None)
         deltas = None
     else:
         deltas = {method: {metric: totals[method][metric] - union[metric] for metric in ('missed', 'excess')}
-                  for method in visual_methods}
+                  for method in visual_methods if method not in blocked}
     report = dict(protocol=protocol, cases=rows, totals=totals, by_story=by_story,
-                  versus_union=deltas, visual_evaluation_complete=not invalid, visual_invalid=invalid)
+                  versus_union=deltas, visual_evaluation_complete=not invalid, visual_invalid=invalid,
+                  verification_evaluation_complete=(not invalid and not verification_invalid)
+                  if args.verify_visual else None, verification_invalid=verification_invalid)
     (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-    print(json.dumps(dict(totals=totals, versus_union=deltas, visual_invalid=invalid), indent=2))
+    print(json.dumps(dict(totals=totals, versus_union=deltas, visual_invalid=invalid,
+                          verification_invalid=verification_invalid), indent=2))
 
 
 if __name__ == '__main__':
