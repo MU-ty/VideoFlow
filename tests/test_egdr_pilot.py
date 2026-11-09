@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'research/dependency_probe'))
-from egdr import build_plan, grounded_verdict, public_case, shot_sources
+from egdr import build_plan, confirm_negatives, grounded_verdict, public_case, shot_sources
 
 
 class EvidenceProbeTest(unittest.TestCase):
@@ -22,6 +22,16 @@ class EvidenceProbeTest(unittest.TestCase):
         self.assertEqual(grounded_verdict(supported, {'metadata': 'No buckle visible.'})['verdict'],
                          'unaffected')
         self.assertEqual(grounded_verdict('not JSON', sources)['verdict'], 'uncertain')
+
+    def test_second_pass_demotes_unconfirmed_negatives(self):
+        first = grounded_verdict(json.dumps({
+            'identity': {'answer': 'yes', 'source': 'observation', 'quote': 'A white can'},
+            'scope': {'answer': 'no', 'source': 'observation', 'quote': 'stands upright'},
+        }), {'observation': 'A white can stands upright.'})
+        for reply in ('{"scope":false}', '{}', '{"scope":"true"}', 'invalid'):
+            self.assertEqual(confirm_negatives(first, reply)['verdict'], 'uncertain')
+        self.assertEqual(confirm_negatives(first, '{"scope":true}')['verdict'], 'unaffected')
+        self.assertEqual(first['verdict'], 'unaffected')
 
     def test_affected_and_hard_edges_survive_review_and_budget(self):
         case = dict(shots=dict.fromkeys(['S1', 'S2', 'S3', 'S4', 'S5'], ''),
