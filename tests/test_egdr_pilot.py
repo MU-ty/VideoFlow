@@ -3,9 +3,10 @@ import json
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'research/dependency_probe'))
-from egdr import build_plan, confirm_negatives, grounded_verdict, public_case, shot_sources
+from egdr import build_plan, confirm_negatives, grounded_verdict, public_case, recall_checklist, shot_sources
 
 
 class EvidenceProbeTest(unittest.TestCase):
@@ -54,6 +55,30 @@ class EvidenceProbeTest(unittest.TestCase):
                          {'metadata': 'A strap.'})
         self.assertEqual(shot_sources('A strap. Frame observation: A buckle.', True),
                          {'metadata': 'A strap.', 'observation': 'A buckle.'})
+
+    def test_checklist_recall_requires_local_positive_evidence_and_closes_references(self):
+        case = dict(shots=dict.fromkeys(['S1', 'S2', 'S3', 'S4', 'S5'], ''), declared=[],
+                    edges=[dict(parent='S2', child='S3', kind='reference')])
+        sources = {shot: {'metadata': f'Evidence for {shot}'} for shot in case['shots']}
+
+        def review(server, model, case, shot, sources):
+            if shot == 'S3':
+                return 'invalid'
+            quote = 'Evidence for S2' if shot == 'S4' else sources[shot]['metadata']
+            return json.dumps({
+                key: {'answer': 'yes', 'source': 'metadata', 'quote': quote}
+                for key in ('identity', 'target', 'visibility', 'scope')
+                if shot != 'S5' or key != 'target'
+            })
+
+        with patch('egdr.review_omission', side_effect=review) as mocked:
+            selected, audit = recall_checklist('server', 'model', case, sources, {'S1'})
+        self.assertEqual([call.args[3] for call in mocked.call_args_list], ['S2', 'S3', 'S4', 'S5'])
+        self.assertEqual(selected, {'S1', 'S2', 'S3'})
+        self.assertEqual(audit['added'], ['S2'])
+        self.assertEqual(audit['closure_added'], ['S3'])
+        self.assertEqual(audit['extra_model_calls'], 4)
+        self.assertEqual(audit['shots']['S5']['checks']['target'], {'answer': 'unknown'})
 
 
 if __name__ == '__main__':
