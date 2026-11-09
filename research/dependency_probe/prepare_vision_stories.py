@@ -59,18 +59,71 @@ EDITS = {
          'Recolor only the battery compartment cover on the underside of the cream synthesizer to yellow.'),
     ],
 }
+MICROSCOPE = 'a cream microscope with two teal stripes on its upright arm'
+SEWING_MACHINE = 'a sky-blue sewing machine with a white zigzag painted on its front'
+HOLDOUT_STORIES = {
+    'microscope_lab': [
+        f'Steady three-quarter view of {MICROSCOPE} on a lab bench. Show the large red '
+        'ridged focus wheel on the side of the arm and the slim red slide clip on the black stage.',
+        f'Side macro shot of {MICROSCOPE}. A hand slowly turns the large red ridged focus wheel '
+        'under the arm. Keep the two teal stripes and the wheel in the same frame.',
+        f'Tight view of the black slide stage of {MICROSCOPE}. Show the narrow red slide clip '
+        'holding the glass slide. The focus wheel is outside the frame.',
+        'Side view of a different cream microscope with a large orange diamond sticker on its '
+        'upright arm, no teal stripes, and a large red ridged focus wheel.',
+    ],
+    'sewing_workbench': [
+        f'Steady front view of {SEWING_MACHINE} on a workbench. Show the white circular stitch '
+        'selector with black tick marks and the small red rectangular lever directly below it.',
+        f'Front macro shot of {SEWING_MACHINE}. A hand touches the small red rectangular '
+        'lever below the white stitch selector. Keep the white zigzag visible.',
+        f'Right-side view of {SEWING_MACHINE}. A hand turns the large white side handwheel. '
+        'The front control panel is out of frame.',
+        'Front view of a different sky-blue sewing machine with a white crescent decal '
+        'and no zigzag. Show its white circular selector and small red rectangular lever.',
+    ],
+}
+HOLDOUT_EDITS = {
+    'microscope_lab': [
+        ('H1', 'ridged focus wheel', 'color',
+         'Recolor only the large red ridged focus wheel on the side of the cream microscope '
+         'with two teal stripes to blue. Leave the orange-diamond microscope unchanged.'),
+        ('H2', 'slide clip', 'color',
+         'Recolor only the narrow red slide clip beside the glass slide on the black stage '
+         'of the two-stripe microscope to yellow. Leave the red focus wheel unchanged.'),
+        ('H3', 'underside serial plate', 'color',
+         'Recolor only the serial-number plate on the underside of the two-stripe microscope '
+         'base to purple. Leave all labels on the top and sides unchanged.'),
+    ],
+    'sewing_workbench': [
+        ('H4', 'front stitch selector', 'color',
+         'Recolor only the round white front stitch selector with black tick marks on the '
+         'zigzag-marked sewing machine to pink. Leave the white side handwheel unchanged.'),
+        ('H5', 'rectangular reverse lever', 'color',
+         'Recolor only the small red rectangular lever directly below the front stitch '
+         'selector on the zigzag-marked sewing machine to green. Leave the crescent-marked machine unchanged.'),
+        ('H6', 'underside service hatch', 'color',
+         'Recolor only the service hatch on the underside of the zigzag-marked sewing machine '
+         'to gold. Leave its front panel and side unchanged.'),
+    ],
+}
+SUITES = {
+    'pilot': (STORIES, EDITS, 84001),
+    'holdout': (HOLDOUT_STORIES, HOLDOUT_EDITS, 85001),
+}
 
 
-def protocol(server):
+def protocol(server, suite='pilot'):
+    stories, edits_by_story, seed_start = SUITES[suite]
     return dict(server=server, sample_fractions=FRACTIONS, stories={
         story: dict(assets=[
-            asset(f'S{j}', prompt, {}, 84001 + i * 100 + j)
+            asset(f'S{j}', prompt, {}, seed_start + i * 100 + j)
             for j, prompt in enumerate(prompts, 1)
-        ]) for i, (story, prompts) in enumerate(STORIES.items())
+        ]) for i, (story, prompts) in enumerate(stories.items())
     }, edits={
         story: [dict(id=case, entity=entity, attribute=attribute, edit=edit, declared=[])
                 for case, entity, attribute, edit in edits]
-        for story, edits in EDITS.items()
+        for story, edits in edits_by_story.items()
     })
 
 
@@ -95,11 +148,11 @@ def render_story(folder, backend, manifest, timeout, poll):
         runtime.close()
 
 
-def prepare(output, backend, timeout, poll):
+def prepare(output, backend, timeout, poll, *, suite='pilot'):
     # Preserve a generation plan before any H3 submission; retries reuse its job ledger.
     output.mkdir(parents=True, exist_ok=True)
     plan_path = output / 'generation-plan.json'
-    frozen = json.loads(json.dumps(protocol(backend.base)))
+    frozen = json.loads(json.dumps(protocol(backend.base, suite)))
     if plan_path.exists():
         if json.loads(plan_path.read_text(encoding='utf-8')) != frozen:
             raise ValueError('existing output belongs to a different generation plan or server')
@@ -143,6 +196,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--server', default='http://127.0.0.1:8188')
+    parser.add_argument('--suite', choices=tuple(SUITES), default='pilot')
     parser.add_argument('--timeout', type=float, default=3600, help='seconds per story')
     parser.add_argument('--poll', type=float, default=3)
     args = parser.parse_args()
@@ -150,7 +204,7 @@ def main():
         parser.error('--timeout and --poll must be finite and positive')
     if not all(shutil.which(cmd) for cmd in ('ffmpeg', 'ffprobe')):
         parser.error('ffmpeg and ffprobe must be available')
-    prepare(args.output, ComfyUI(args.server), args.timeout, args.poll)
+    prepare(args.output, ComfyUI(args.server), args.timeout, args.poll, suite=args.suite)
 
 
 if __name__ == '__main__':
