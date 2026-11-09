@@ -11,6 +11,29 @@ from vision_probe import parse_visual, run_case, visual_reply
 
 
 class VisionProbeTest(unittest.TestCase):
+    def test_retries_invalid_visual_reply_without_scoring_persistent_format_errors(self):
+        case = dict(id='edit', story='story', entity='buckle', attribute='color',
+                    edit='Recolor the buckle', shots={'S1': 'strap', 'S2': 'tool'},
+                    declared=[], gold=['S1'])
+        sheets = {shot: Path(f'{shot}.jpg') for shot in case['shots']}
+        missing_panel = '{"decision":"yes","panel":null,"evidence":"buckle"}'
+        replies = [missing_panel, '{"decision":"yes","panel":1,"evidence":"buckle"}',
+                   'invalid JSON', missing_panel]
+        logs = []
+        with patch('vision_probe.predict', return_value=([], '{}')):
+            with patch('vision_probe.visual_reply', side_effect=replies) as vision:
+                report = run_case(case, sheets, 'server', 'text-model', 'vision-model', logs.append)
+        self.assertEqual(report['visual_retries'], ['S1', 'S2'])
+        self.assertEqual(report['visual_positives'], ['S1'])
+        self.assertEqual(report['visual_invalid'], ['S2'])
+        self.assertEqual(report['visual_unknown'], [])
+        self.assertEqual(report['vision_calls'], 4)
+        self.assertNotIn('vision', {result['method'] for result in report['results']})
+        self.assertEqual([log['attempt'] for log in logs[2:]], [1, 2, 1, 2])
+        self.assertEqual([log['raw'] for log in logs[2:]], replies)
+        self.assertEqual([call.kwargs.get('format_retry', False) for call in vision.call_args_list],
+                         [False, True, False, True])
+
     def test_source_question_omits_edit_and_accepts_observed_evidence_key(self):
         reply = '{"decision":"yes","panel":1,"evidence_description":"visible buckle"}'
         response = io.BytesIO(json.dumps({'message': {'content': reply}}).encode())

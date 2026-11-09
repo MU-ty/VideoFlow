@@ -31,6 +31,16 @@ VISIBILITY_OUTPUT = (
     'Return JSON with decision (yes, no, or unknown), panel (1–4 for yes, '
     'null otherwise), and a short evidence description.'
 )
+VISUAL_RETRY_SCHEMA = {
+    'type': 'object',
+    'required': ['decision', 'panel', 'evidence'],
+    'additionalProperties': False,
+    'properties': {
+        'decision': {'enum': ['yes', 'no', 'unknown']},
+        'panel': {'enum': [None, 1, 2, 3, 4]},
+        'evidence': {'type': 'string'},
+    },
+}
 
 
 def load_cases(path):
@@ -94,13 +104,19 @@ def make_sheet(clip, sheet):
                 sheet_sha256=sha256(sheet.read_bytes()).hexdigest())
 
 
-def visual_reply(server, model, edit, sheet, *, visibility_question=None):
+def visual_reply(server, model, edit, sheet, *, visibility_question=None, format_retry=False):
     if visibility_question is None:
         prompt = VISUAL_INSTRUCTIONS + json.dumps({'edit': edit}, ensure_ascii=False)
     else:
         prompt = visibility_question + ' ' + VISIBILITY_OUTPUT
+    if format_retry:
+        prompt += (
+            '\nUse the exact JSON keys decision, panel, and evidence. For yes, use an integer '
+            'panel from 1 to 4 and describe the visible evidence from that panel. If you cannot '
+            'identify the panel and evidence, use unknown. For no or unknown, use a null panel.'
+        )
     request = Request(server.rstrip('/') + '/api/chat', data=json.dumps({
-        'model': model, 'stream': False, 'format': 'json',
+        'model': model, 'stream': False, 'format': VISUAL_RETRY_SCHEMA if format_retry else 'json',
         'options': {'temperature': 0, 'seed': 42, 'num_predict': 384},
         'messages': [{'role': 'user', 'content': prompt,
                       'images': [base64.b64encode(sheet.read_bytes()).decode('ascii')]}],
@@ -143,25 +159,38 @@ def run_case(case, sheets, server, text_model, vision_model, log, *, visibility_
     methods['checklist_union'] = close_selection(public, union)
 
     positives = set()
-    unknown = []
+    unknown, retries, invalid = [], [], []
     for shot in sorted(set(case['shots']) - declared):
         raw = visual_reply(server, vision_model, case['edit'], sheets[shot],
                            visibility_question=visibility_question)
-        log(dict(case=case['id'], method='vision', shot=shot, raw=raw))
-        reply = parse_visual(raw)
+        log(dict(case=case['id'], method='vision', shot=shot, attempt=1, raw=raw))
+        try:
+            reply = parse_visual(raw)
+        except ValueError:
+            retries.append(shot)
+            raw = visual_reply(server, vision_model, case['edit'], sheets[shot],
+                               visibility_question=visibility_question, format_retry=True)
+            log(dict(case=case['id'], method='vision', shot=shot, attempt=2, raw=raw))
+            try:
+                reply = parse_visual(raw)
+            except ValueError:
+                invalid.append(shot)
+                continue
         if reply['decision'] == 'yes':
             positives.add(shot)
         elif reply['decision'] == 'unknown':
             unknown.append(shot)
-    methods['vision'] = close_selection(public, positives)
-    methods['union_plus_vision'] = close_selection(public, union | positives)
+    if not invalid:
+        methods['vision'] = close_selection(public, positives)
+        methods['union_plus_vision'] = close_selection(public, union | positives)
     gold, costs = set(case['gold']), case.get('costs', {})
     results = [dict(method=method, selected=sorted(selected), missed=sorted(gold - selected),
                     excess=sorted(selected - gold), cost=sum(costs.get(s, 1) for s in selected))
                for method, selected in methods.items()]
     return dict(case=case['id'], story=case['story'], gold=sorted(gold), results=results,
                 visual_positives=sorted(positives), visual_unknown=unknown,
-                vision_calls=len(case['shots']) - len(declared))
+                visual_retries=retries, visual_invalid=invalid,
+                vision_calls=len(case['shots']) - len(declared) + len(retries))
 
 
 def main():
@@ -197,6 +226,7 @@ def main():
                     vision_model=args.vision_model,
                     visual_instructions=VISIBILITY_OUTPUT if questions else VISUAL_INSTRUCTIONS,
                     visibility_questions=questions,
+                    visual_format_retry_limit=1,
                     prepare_only=args.prepare_only)
     (args.output / 'protocol.json').write_text(json.dumps(protocol, indent=2) + '\n', encoding='utf-8')
     if args.prepare_only:
@@ -211,14 +241,23 @@ def main():
             print(f"{case['story']}/{case['id']}", flush=True)
             rows.append(run_case(case, sheets[case['story']], args.server, args.text_model,
                                  args.vision_model, log, visibility_question=questions.get(case['id'])))
+    invalid = {row['case']: row['visual_invalid'] for row in rows if row['visual_invalid']}
+    visual_methods = ('vision', 'union_plus_vision')
     totals = summarize(rows)
     by_story = {story: summarize([row for row in rows if row['story'] == story]) for story in sheets}
     union = totals['checklist_union']
-    deltas = {method: {metric: totals[method][metric] - union[metric] for metric in ('missed', 'excess')}
-              for method in ('vision', 'union_plus_vision')}
-    report = dict(protocol=protocol, cases=rows, totals=totals, by_story=by_story, versus_union=deltas)
+    if invalid:
+        for counts in (totals, *by_story.values()):
+            for method in visual_methods:
+                counts.pop(method, None)
+        deltas = None
+    else:
+        deltas = {method: {metric: totals[method][metric] - union[metric] for metric in ('missed', 'excess')}
+                  for method in visual_methods}
+    report = dict(protocol=protocol, cases=rows, totals=totals, by_story=by_story,
+                  versus_union=deltas, visual_evaluation_complete=not invalid, visual_invalid=invalid)
     (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-    print(json.dumps(dict(totals=totals, versus_union=deltas), indent=2))
+    print(json.dumps(dict(totals=totals, versus_union=deltas, visual_invalid=invalid), indent=2))
 
 
 if __name__ == '__main__':
