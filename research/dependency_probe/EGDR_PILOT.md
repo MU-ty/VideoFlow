@@ -92,3 +92,17 @@ python -u research/dependency_probe/vision_probe.py --cases new_stories.json \
 ```
 
 两次命令使用不同的新输出目录。正式运行在 `report.json` 保存汇总，在 `responses.jsonl` 保存逐条原始回复，在 `protocol.json` 保存输入哈希、模型标签和采样时间。
+
+### 生成两组新故事的原片
+
+如果手头没有独立素材，在运行 H3 的学校服务器上执行：
+
+```bash
+export PATH="$HOME/apps/videoflow-ffmpeg:$PATH"
+python -u research/dependency_probe/prepare_vision_stories.py \
+  --server http://127.0.0.1:8188 --output runs/vision-stories-v1
+```
+
+脚本为行李箱和合成器两个故事各生成 4 个原始镜头，保存固定提示词、种子和候选编辑。它只生成编辑前版本。中断后可用原命令继续查询已提交任务。若日志明确报告任务失败，先查看对应故事的 `worker.jsonl` 和 ComfyUI 历史。
+
+上传输出目录里的 `vision-story-review.zip` 供人工复核。它只包含八张四帧图与来源索引，原片和生成计划留在服务器。不要依据提示词直接填受影响镜头，H3 可能没有生成指定部件或标识。先用图记录可见内容，再根据实际画面确定候选编辑的受影响镜头。对固定四帧无法判断的情况回看原片。最终评测 JSON 放在与 `review-index.json` 同一目录，使用索引里的相对原片路径。
