@@ -1,0 +1,12 @@
+{
+  "target_shots": [
+    "S1",
+    "S3"
+  ],
+  "source_sha256": {
+    "S1": "10181e006a1a0d9eb0e7449fd4f4cdf0f33c4117eae776b2c4fac26bcb85759f",
+    "S2": "5aafe52180248f04e89924787e476eb2706df991a9a559f6cf38bfed71b140ea",
+    "S3": "b6fbd63b16fda9d20dc4c6b4ae41b62aa1e1070aaa2fae88208367f8828b19cd",
+    "S4": "1185ce1ce7ecbe69149a779c8e16cedcb48455ad5278024b4be5b4e51c28977c"
+  }
+}

@@ -28,7 +28,9 @@ POLICIES = {
     'full': 'full',
     'worklist': 'attr_dag',
     'online_egdr': 'online_egdr',
+    'oracle_egdr': 'oracle_egdr',
 }
+DEFERRED_POLICIES = {'online_egdr', 'oracle_egdr'}
 KEY = 'target.color'
 ENTITY = 'ribbed amber handwheel on the cream press with two teal stripes'
 
@@ -204,7 +206,7 @@ def apply_policy(runtime, case, selected, source, evidence, policy, expected_rev
     event_id = case['id'] if expected_revision == 1 else f"{case['id']}-{expected_revision}"
     event = dict(id=event_id, expected_revision=expected_revision, target=target, key=KEY,
                  value=case['edit'], scope='local')
-    if policy == 'online_egdr':
+    if policy in DEFERRED_POLICIES:
         event['evidence_candidates'] = sorted(set(source) - {target})
     elif policy == 'full' and continuous:
         # Assign the edit value to every authored binding without introducing
@@ -243,6 +245,24 @@ def source_probes(root, sheets, case, question, args, log):
     return probes
 
 
+def bind_oracle(labels, source, case):
+    """Accept only complete human labels tied to the exact pre-edit clips."""
+    if not isinstance(labels, dict) or set(labels) != {'target_shots', 'source_sha256'}:
+        raise ValueError('oracle labels require target_shots and source_sha256')
+    if labels['source_sha256'] != {shot: row['sha256'] for shot, row in source.items()}:
+        raise ValueError('oracle labels do not match the frozen source bytes')
+    targets = labels['target_shots']
+    if (not isinstance(targets, list) or any(not isinstance(shot, str) for shot in targets)
+            or len(set(targets)) != len(targets)
+            or not set(case['declared']) <= set(targets) <= set(source)):
+        raise ValueError('oracle targets must be unique source shots including every declared target')
+    return {
+        shot: ('match' if shot in targets else 'distinct',
+               fingerprint(dict(kind='human_oracle', shot=shot, labels=labels)))
+        for shot in sorted(set(source) - set(case['declared']))
+    }
+
+
 def run(args):
     backend = ComfyUI(args.server)
     queue = backend._request('/queue')
@@ -264,7 +284,7 @@ def run(args):
                question=question, policies=args.policies, text_model=args.text_model,
                vision_model=args.vision_model, frame_notes=bool(args.frame_notes), timeout=args.timeout,
                server=backend.base, continuous=args.continuous,
-               lamp_reference_frames=args.lamp_reference_frames))
+               lamp_reference_frames=args.lamp_reference_frames, oracle_labels=bool(args.oracle_labels)))
     if args.source_run:
         source_protocol = json.loads((args.source_run / 'protocol.json').read_text(encoding='utf-8'))
         if source_protocol['manifest'] != manifest or source_protocol['server'] != backend.base:
@@ -289,6 +309,11 @@ def run(args):
                     != {row['asset']: row['sha256'] for row in frozen['assets']}):
                 raise RuntimeError('provider source bytes differ from the frozen run')
         source = {row['asset']: row for row in before['assets']}
+        oracle_verdicts = {}
+        if args.oracle_labels:
+            labels = json.loads(args.oracle_labels.read_text(encoding='utf-8'))
+            oracle_verdicts = bind_oracle(labels, source, case)
+            write_json(args.output / 'oracle_labels.json', labels)
         sheets = {shot: args.output / 'source' / f'{shot}.jpg' for shot in source}
         frames = {shot: make_sheet(args.output / 'source' / row['file'], sheets[shot])
                   for shot, row in source.items()}
@@ -302,10 +327,12 @@ def run(args):
         started = time.monotonic()
         if args.continuous:
             with (args.output / 'responses.jsonl').open('x', encoding='utf-8') as responses:
-                probes = source_probes(args.output, sheets, case, question, args, responses)
+                probes = (source_probes(args.output, sheets, case, question, args, responses)
+                          if 'online_egdr' in args.policies else {})
                 responses.flush()
             raw = [json.loads(line) for line in (args.output / 'responses.jsonl').read_text().splitlines()]
-            choices = dict(attr_dag=set(case['declared']), full=set(source), online_egdr=set(case['declared']))
+            choices = dict(attr_dag=set(case['declared']), full=set(source),
+                           online_egdr=set(case['declared']), oracle_egdr=set(case['declared']))
             audit = dict(probes=probes)
         else:
             with (args.output / 'responses.jsonl').open('x', encoding='utf-8') as responses:
@@ -330,6 +357,12 @@ def run(args):
                    selections={key: sorted(value) for key, value in choices.items()}))
         evidence = dict(frames=frames, responses=raw, case=case, question=question,
                         text_model=args.text_model, vision_model=args.vision_model)
+        vlm_decisions = {'yes': 'match', 'no': 'distinct', 'unknown': 'fallback'}
+        vlm_verdicts = {
+            shot: (vlm_decisions[probe['decision']],
+                   fingerprint(dict(shot=shot, probe=probe, frame=frames[shot], evidence=evidence)))
+            for shot, probe in probes.items()
+        } if args.continuous else {}
         rows = []
         for policy in args.policies:
             folder = args.output / policy
@@ -349,10 +382,9 @@ def run(args):
                     plan = apply_policy(runtime, red, selected, source, evidence, policy,
                                         expected_revision=2, continuous=True)
                     submit_anchor(folder, runtime, backend, 3, final_builder)
-                    if policy == 'online_egdr':
-                        for shot, probe in probes.items():
-                            decision = {'yes': 'match', 'no': 'distinct', 'unknown': 'fallback'}[probe['decision']]
-                            proof = fingerprint(dict(shot=shot, probe=probe, frame=frames[shot], evidence=evidence))
+                    if policy in DEFERRED_POLICIES:
+                        verdicts = oracle_verdicts if policy == 'oracle_egdr' else vlm_verdicts
+                        for shot, (decision, proof) in verdicts.items():
                             if not obsolete_evidence_rejected:
                                 try:
                                     runtime.resolve_evidence(2, shot, source[shot]['input_hash'], proof, decision)
@@ -449,6 +481,8 @@ def main():
     parser.add_argument('--vision-model', default='qwen2.5vl:7b')
     parser.add_argument('--policies', nargs='+', choices=tuple(POLICIES),
                         default=['declared', 'checklist', 'raw_union', 'egdr', 'full'])
+    parser.add_argument('--oracle-labels', type=Path,
+                        help='pre-edit human target labels and SHA-256 hashes for every source shot')
     parser.add_argument('--continuous', action='store_true', help='run the two-edit deferred-repair experiment')
     parser.add_argument('--story', choices=tuple(STORIES), default='striped-press')
     parser.add_argument('--seed', type=int, default=88001)
@@ -468,11 +502,16 @@ def main():
     if args.lamp_reference_frames and not (args.story == 'hexagon-lamp' and args.seed == 88101
                                             and args.source_run and args.continuous):
         parser.error('--lamp-reference-frames requires --story hexagon-lamp --seed 88101 --source-run and --continuous')
-    continuous_policies = {'worklist', 'online_egdr', 'full'}
+    continuous_policies = {'worklist', 'full'} | DEFERRED_POLICIES
     if args.continuous and not set(args.policies) <= continuous_policies:
-        parser.error('--continuous requires --policies worklist online_egdr full (or a subset)')
-    if not args.continuous and 'online_egdr' in args.policies:
-        parser.error('online_egdr requires --continuous')
+        parser.error('--continuous supports worklist, online_egdr, oracle_egdr, and full')
+    if not args.continuous and DEFERRED_POLICIES.intersection(args.policies):
+        parser.error('online_egdr and oracle_egdr require --continuous')
+    if 'oracle_egdr' in args.policies:
+        if not args.oracle_labels or not args.source_run:
+            parser.error('oracle_egdr requires --oracle-labels and a frozen --source-run')
+    elif args.oracle_labels:
+        parser.error('--oracle-labels requires oracle_egdr in --policies')
     if len(set(args.policies)) != len(args.policies):
         parser.error('policies must be unique')
     if not all(shutil.which(command) for command in ('ffmpeg', 'ffprobe')):
