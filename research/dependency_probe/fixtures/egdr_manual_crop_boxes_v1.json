@@ -1,0 +1,1284 @@
+{
+  "schema_version": 1,
+  "source_run": "egdr-local-recheck-20261110-111713",
+  "image_size_px": [
+    480,
+    270
+  ],
+  "coordinate_format": "[left, top, right, bottom], zero-based pixels; right and bottom exclusive",
+  "annotation_method": "Manual visual bounding-box annotation on the provided source frames",
+  "frames": [
+    {
+      "id": "cafe_steam_service-clear-distractor",
+      "panel": 1,
+      "source_frame": "crops/cafe_steam_service-clear-distractor-p1.png",
+      "frame_sha256": "995b16f4d6d4c482278faf7b0dcadd5de3b562cf5a99f7057280001b40d7d003",
+      "source_image_sha256": "cd86f41a2b9ab25e8f54586089c72a903ef18c2004287d12ef27131e82624825",
+      "condition": "clear_distractor",
+      "marker_shape": "hexagon",
+      "marker_owner": "device",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          97,
+          23,
+          445,
+          254
+        ],
+        "marker": [
+          322,
+          43,
+          380,
+          106
+        ],
+        "part": [
+          308,
+          106,
+          389,
+          185
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          97,
+          23,
+          445,
+          254
+        ],
+        "marker": [
+          322,
+          43,
+          380,
+          106
+        ],
+        "part": [
+          308,
+          106,
+          389,
+          185
+        ]
+      },
+      "expected_conflict_confirmation": true
+    },
+    {
+      "id": "cafe_steam_service-clear-distractor",
+      "panel": 2,
+      "source_frame": "crops/cafe_steam_service-clear-distractor-p2.png",
+      "frame_sha256": "e4141062ad1e367337310d73abd43b57ffc2ab760694651cfd75a6cb23545b13",
+      "source_image_sha256": "cd86f41a2b9ab25e8f54586089c72a903ef18c2004287d12ef27131e82624825",
+      "condition": "clear_distractor",
+      "marker_shape": "hexagon",
+      "marker_owner": "device",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          83,
+          17,
+          452,
+          257
+        ],
+        "marker": [
+          334,
+          32,
+          393,
+          98
+        ],
+        "part": [
+          320,
+          98,
+          404,
+          179
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          83,
+          17,
+          452,
+          257
+        ],
+        "marker": [
+          334,
+          32,
+          393,
+          98
+        ],
+        "part": [
+          320,
+          98,
+          404,
+          179
+        ]
+      },
+      "expected_conflict_confirmation": true
+    },
+    {
+      "id": "cafe_steam_service-clear-distractor",
+      "panel": 3,
+      "source_frame": "crops/cafe_steam_service-clear-distractor-p3.png",
+      "frame_sha256": "d37e68f3457bec828c6186af0b4cc03f428e73f6fd631af59897e7fe26bbecd0",
+      "source_image_sha256": "cd86f41a2b9ab25e8f54586089c72a903ef18c2004287d12ef27131e82624825",
+      "condition": "clear_distractor",
+      "marker_shape": "hexagon",
+      "marker_owner": "device",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          88,
+          17,
+          462,
+          266
+        ],
+        "marker": [
+          325,
+          34,
+          389,
+          104
+        ],
+        "part": [
+          310,
+          105,
+          399,
+          188
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          88,
+          17,
+          462,
+          266
+        ],
+        "marker": [
+          325,
+          34,
+          389,
+          104
+        ],
+        "part": [
+          310,
+          105,
+          399,
+          188
+        ]
+      },
+      "expected_conflict_confirmation": true
+    },
+    {
+      "id": "cafe_steam_service-clear-distractor",
+      "panel": 4,
+      "source_frame": "crops/cafe_steam_service-clear-distractor-p4.png",
+      "frame_sha256": "9bdf35aca5c5b325c797469a0617fd6244b47a1a4b1601def892bd42e75ed0a6",
+      "source_image_sha256": "cd86f41a2b9ab25e8f54586089c72a903ef18c2004287d12ef27131e82624825",
+      "condition": "clear_distractor",
+      "marker_shape": "hexagon",
+      "marker_owner": "device",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          86,
+          17,
+          452,
+          253
+        ],
+        "marker": [
+          331,
+          35,
+          391,
+          101
+        ],
+        "part": [
+          317,
+          100,
+          400,
+          182
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          86,
+          17,
+          452,
+          253
+        ],
+        "marker": [
+          331,
+          35,
+          391,
+          101
+        ],
+        "part": [
+          317,
+          100,
+          400,
+          182
+        ]
+      },
+      "expected_conflict_confirmation": true
+    },
+    {
+      "id": "cafe_steam_service-part-occluded",
+      "panel": 1,
+      "source_frame": "crops/cafe_steam_service-part-occluded-p1.png",
+      "frame_sha256": "a4ec6382816f35966885c1cf5fc813b1dea1909798c7d3050fd7ccb164805959",
+      "source_image_sha256": "147f33e064b3766caaa83e1e0103882382df620c398a302b4c03a63a478cb855",
+      "condition": "part_occluded",
+      "marker_shape": "hexagon",
+      "marker_owner": "device",
+      "part_visibility": "occluded",
+      "boxes_px": {
+        "housing": [
+          97,
+          23,
+          445,
+          254
+        ],
+        "marker": [
+          322,
+          43,
+          380,
+          106
+        ],
+        "part": null
+      },
+      "occluder_box_px": [
+        278,
+        108,
+        430,
+        205
+      ],
+      "review_boxes_px": {
+        "housing": [
+          97,
+          23,
+          445,
+          254
+        ],
+        "marker": [
+          322,
+          43,
+          380,
+          106
+        ],
+        "part": [
+          278,
+          108,
+          430,
+          205
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "cafe_steam_service-part-occluded",
+      "panel": 2,
+      "source_frame": "crops/cafe_steam_service-part-occluded-p2.png",
+      "frame_sha256": "e2310fa2dc80f69c09a68766f0b8ebecd8478931783bd26dda06a14baca68970",
+      "source_image_sha256": "147f33e064b3766caaa83e1e0103882382df620c398a302b4c03a63a478cb855",
+      "condition": "part_occluded",
+      "marker_shape": "hexagon",
+      "marker_owner": "device",
+      "part_visibility": "occluded",
+      "boxes_px": {
+        "housing": [
+          83,
+          17,
+          452,
+          257
+        ],
+        "marker": [
+          334,
+          32,
+          393,
+          98
+        ],
+        "part": null
+      },
+      "occluder_box_px": [
+        298,
+        98,
+        455,
+        198
+      ],
+      "review_boxes_px": {
+        "housing": [
+          83,
+          17,
+          452,
+          257
+        ],
+        "marker": [
+          334,
+          32,
+          393,
+          98
+        ],
+        "part": [
+          298,
+          98,
+          455,
+          198
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "cafe_steam_service-part-occluded",
+      "panel": 3,
+      "source_frame": "crops/cafe_steam_service-part-occluded-p3.png",
+      "frame_sha256": "abc802402d82198fd381c78fe9a78d628b962103d75a0398d75626108501f066",
+      "source_image_sha256": "147f33e064b3766caaa83e1e0103882382df620c398a302b4c03a63a478cb855",
+      "condition": "part_occluded",
+      "marker_shape": "hexagon",
+      "marker_owner": "device",
+      "part_visibility": "occluded",
+      "boxes_px": {
+        "housing": [
+          88,
+          17,
+          462,
+          266
+        ],
+        "marker": [
+          325,
+          34,
+          389,
+          104
+        ],
+        "part": null
+      },
+      "occluder_box_px": [
+        272,
+        103,
+        442,
+        213
+      ],
+      "review_boxes_px": {
+        "housing": [
+          88,
+          17,
+          462,
+          266
+        ],
+        "marker": [
+          325,
+          34,
+          389,
+          104
+        ],
+        "part": [
+          272,
+          103,
+          442,
+          213
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "cafe_steam_service-part-occluded",
+      "panel": 4,
+      "source_frame": "crops/cafe_steam_service-part-occluded-p4.png",
+      "frame_sha256": "640ca5a45f8ca9e58b12148c9fe7608ff14490f03a0c0a90c46868ed11de1a83",
+      "source_image_sha256": "147f33e064b3766caaa83e1e0103882382df620c398a302b4c03a63a478cb855",
+      "condition": "part_occluded",
+      "marker_shape": "hexagon",
+      "marker_owner": "device",
+      "part_visibility": "occluded",
+      "boxes_px": {
+        "housing": [
+          86,
+          17,
+          452,
+          253
+        ],
+        "marker": [
+          331,
+          35,
+          391,
+          101
+        ],
+        "part": null
+      },
+      "occluder_box_px": [
+        289,
+        102,
+        450,
+        202
+      ],
+      "review_boxes_px": {
+        "housing": [
+          86,
+          17,
+          452,
+          253
+        ],
+        "marker": [
+          331,
+          35,
+          391,
+          101
+        ],
+        "part": [
+          289,
+          102,
+          450,
+          202
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "cafe_steam_service-marker-on-other-object",
+      "panel": 1,
+      "source_frame": "crops/cafe_steam_service-marker-on-other-object-p1.png",
+      "frame_sha256": "f0d1775be3a33cbede7770286625386f56ad9d4088105b1a86119f9756506c0c",
+      "source_image_sha256": "6da8aa14b4adc2b9c2e033661e6e18802e50d22cc0a19f8fa0a61fb1b5a488a1",
+      "condition": "marker_on_other_object",
+      "marker_shape": "hexagon",
+      "marker_owner": "separate_sign",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          132,
+          31,
+          460,
+          250
+        ],
+        "marker": [
+          54,
+          105,
+          102,
+          158
+        ],
+        "part": [
+          328,
+          108,
+          405,
+          183
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          132,
+          31,
+          460,
+          250
+        ],
+        "marker": [
+          54,
+          105,
+          102,
+          158
+        ],
+        "part": [
+          328,
+          108,
+          405,
+          183
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "cafe_steam_service-marker-on-other-object",
+      "panel": 2,
+      "source_frame": "crops/cafe_steam_service-marker-on-other-object-p2.png",
+      "frame_sha256": "b3844957ca587de3c5d5883d6a33beb1fcb38b69b56e7eba97a82c34c8ae2c18",
+      "source_image_sha256": "6da8aa14b4adc2b9c2e033661e6e18802e50d22cc0a19f8fa0a61fb1b5a488a1",
+      "condition": "marker_on_other_object",
+      "marker_shape": "hexagon",
+      "marker_owner": "separate_sign",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          122,
+          23,
+          468,
+          246
+        ],
+        "marker": [
+          26,
+          108,
+          83,
+          170
+        ],
+        "part": [
+          342,
+          100,
+          421,
+          178
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          122,
+          23,
+          468,
+          246
+        ],
+        "marker": [
+          26,
+          108,
+          83,
+          170
+        ],
+        "part": [
+          342,
+          100,
+          421,
+          178
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "cafe_steam_service-marker-on-other-object",
+      "panel": 3,
+      "source_frame": "crops/cafe_steam_service-marker-on-other-object-p3.png",
+      "frame_sha256": "f2aa33a587f33a3cc15f4f088828f8b15c9540df3bcf3df5fbd9f03227759f12",
+      "source_image_sha256": "6da8aa14b4adc2b9c2e033661e6e18802e50d22cc0a19f8fa0a61fb1b5a488a1",
+      "condition": "marker_on_other_object",
+      "marker_shape": "hexagon",
+      "marker_owner": "separate_sign",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          126,
+          26,
+          478,
+          265
+        ],
+        "marker": [
+          48,
+          101,
+          97,
+          157
+        ],
+        "part": [
+          331,
+          107,
+          415,
+          188
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          126,
+          26,
+          478,
+          265
+        ],
+        "marker": [
+          48,
+          101,
+          97,
+          157
+        ],
+        "part": [
+          331,
+          107,
+          415,
+          188
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "cafe_steam_service-marker-on-other-object",
+      "panel": 4,
+      "source_frame": "crops/cafe_steam_service-marker-on-other-object-p4.png",
+      "frame_sha256": "8d88c39c9445d3cc6d7da630bda64dafd0b16ff5fd96d2f0754dc769c1f2e498",
+      "source_image_sha256": "6da8aa14b4adc2b9c2e033661e6e18802e50d22cc0a19f8fa0a61fb1b5a488a1",
+      "condition": "marker_on_other_object",
+      "marker_shape": "hexagon",
+      "marker_owner": "separate_sign",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          124,
+          26,
+          470,
+          247
+        ],
+        "marker": [
+          35,
+          107,
+          88,
+          165
+        ],
+        "part": [
+          338,
+          103,
+          418,
+          181
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          124,
+          26,
+          470,
+          247
+        ],
+        "marker": [
+          35,
+          107,
+          88,
+          165
+        ],
+        "part": [
+          338,
+          103,
+          418,
+          181
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "rov_recovery-clear-distractor",
+      "panel": 1,
+      "source_frame": "crops/rov_recovery-clear-distractor-p1.png",
+      "frame_sha256": "2771bb2219d5b02381601b881cb4e4187a7bcce860bb19618a4d9256988e52ca",
+      "source_image_sha256": "c947b7cd8b0c5eb8af99c4069087dc92e5597568cdc5bd0ad077028d02b9d38a",
+      "condition": "clear_distractor",
+      "marker_shape": "triangle",
+      "marker_owner": "device",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          85,
+          36,
+          451,
+          267
+        ],
+        "marker": [
+          309,
+          53,
+          365,
+          102
+        ],
+        "part": [
+          281,
+          128,
+          395,
+          159
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          85,
+          36,
+          451,
+          267
+        ],
+        "marker": [
+          309,
+          53,
+          365,
+          102
+        ],
+        "part": [
+          281,
+          128,
+          395,
+          159
+        ]
+      },
+      "expected_conflict_confirmation": true
+    },
+    {
+      "id": "rov_recovery-clear-distractor",
+      "panel": 2,
+      "source_frame": "crops/rov_recovery-clear-distractor-p2.png",
+      "frame_sha256": "8c2ab855ae8a516919316718438346238cab09e2ffb07c3f106cdcf93ab03712",
+      "source_image_sha256": "c947b7cd8b0c5eb8af99c4069087dc92e5597568cdc5bd0ad077028d02b9d38a",
+      "condition": "clear_distractor",
+      "marker_shape": "triangle",
+      "marker_owner": "device",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          76,
+          32,
+          467,
+          270
+        ],
+        "marker": [
+          321,
+          42,
+          380,
+          94
+        ],
+        "part": [
+          293,
+          121,
+          419,
+          152
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          76,
+          32,
+          467,
+          270
+        ],
+        "marker": [
+          321,
+          42,
+          380,
+          94
+        ],
+        "part": [
+          293,
+          121,
+          419,
+          152
+        ]
+      },
+      "expected_conflict_confirmation": true
+    },
+    {
+      "id": "rov_recovery-clear-distractor",
+      "panel": 3,
+      "source_frame": "crops/rov_recovery-clear-distractor-p3.png",
+      "frame_sha256": "c8799fb915e030346d670952dd079716148248f1d864a43407c42d94f1b7e682",
+      "source_image_sha256": "c947b7cd8b0c5eb8af99c4069087dc92e5597568cdc5bd0ad077028d02b9d38a",
+      "condition": "clear_distractor",
+      "marker_shape": "triangle",
+      "marker_owner": "device",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          75,
+          31,
+          467,
+          270
+        ],
+        "marker": [
+          312,
+          47,
+          373,
+          99
+        ],
+        "part": [
+          278,
+          127,
+          401,
+          159
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          75,
+          31,
+          467,
+          270
+        ],
+        "marker": [
+          312,
+          47,
+          373,
+          99
+        ],
+        "part": [
+          278,
+          127,
+          401,
+          159
+        ]
+      },
+      "expected_conflict_confirmation": true
+    },
+    {
+      "id": "rov_recovery-clear-distractor",
+      "panel": 4,
+      "source_frame": "crops/rov_recovery-clear-distractor-p4.png",
+      "frame_sha256": "4e8181d2f51be14ced5f10949029db3c35731eaa87b28a12c46067f96ae29919",
+      "source_image_sha256": "c947b7cd8b0c5eb8af99c4069087dc92e5597568cdc5bd0ad077028d02b9d38a",
+      "condition": "clear_distractor",
+      "marker_shape": "triangle",
+      "marker_owner": "device",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          76,
+          31,
+          463,
+          265
+        ],
+        "marker": [
+          319,
+          46,
+          378,
+          98
+        ],
+        "part": [
+          291,
+          125,
+          413,
+          155
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          76,
+          31,
+          463,
+          265
+        ],
+        "marker": [
+          319,
+          46,
+          378,
+          98
+        ],
+        "part": [
+          291,
+          125,
+          413,
+          155
+        ]
+      },
+      "expected_conflict_confirmation": true
+    },
+    {
+      "id": "rov_recovery-part-occluded",
+      "panel": 1,
+      "source_frame": "crops/rov_recovery-part-occluded-p1.png",
+      "frame_sha256": "8d6b9a123d090d205d54d704cd89447768dfaef3e9e1347c47b8080a6435d8b9",
+      "source_image_sha256": "47560fc9e2b7a063add74f4af79a2a321efc3c9b14d9ec0991f981ab132d8a68",
+      "condition": "part_occluded",
+      "marker_shape": "triangle",
+      "marker_owner": "device",
+      "part_visibility": "occluded",
+      "boxes_px": {
+        "housing": [
+          85,
+          36,
+          451,
+          267
+        ],
+        "marker": [
+          309,
+          53,
+          365,
+          102
+        ],
+        "part": null
+      },
+      "occluder_box_px": [
+        260,
+        102,
+        420,
+        202
+      ],
+      "review_boxes_px": {
+        "housing": [
+          85,
+          36,
+          451,
+          267
+        ],
+        "marker": [
+          309,
+          53,
+          365,
+          102
+        ],
+        "part": [
+          260,
+          102,
+          420,
+          202
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "rov_recovery-part-occluded",
+      "panel": 2,
+      "source_frame": "crops/rov_recovery-part-occluded-p2.png",
+      "frame_sha256": "7e4a62b81f8098d2a708ed8130741053d37b91d70f6bc273c190a94443b91bc7",
+      "source_image_sha256": "47560fc9e2b7a063add74f4af79a2a321efc3c9b14d9ec0991f981ab132d8a68",
+      "condition": "part_occluded",
+      "marker_shape": "triangle",
+      "marker_owner": "device",
+      "part_visibility": "occluded",
+      "boxes_px": {
+        "housing": [
+          76,
+          32,
+          467,
+          270
+        ],
+        "marker": [
+          321,
+          42,
+          380,
+          94
+        ],
+        "part": null
+      },
+      "occluder_box_px": [
+        286,
+        91,
+        451,
+        196
+      ],
+      "review_boxes_px": {
+        "housing": [
+          76,
+          32,
+          467,
+          270
+        ],
+        "marker": [
+          321,
+          42,
+          380,
+          94
+        ],
+        "part": [
+          286,
+          91,
+          451,
+          196
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "rov_recovery-part-occluded",
+      "panel": 3,
+      "source_frame": "crops/rov_recovery-part-occluded-p3.png",
+      "frame_sha256": "924c4579a8a3a367742d911dbfde864e74b9d705a6edf097065a5ae601839f60",
+      "source_image_sha256": "47560fc9e2b7a063add74f4af79a2a321efc3c9b14d9ec0991f981ab132d8a68",
+      "condition": "part_occluded",
+      "marker_shape": "triangle",
+      "marker_owner": "device",
+      "part_visibility": "occluded",
+      "boxes_px": {
+        "housing": [
+          75,
+          31,
+          467,
+          270
+        ],
+        "marker": [
+          312,
+          47,
+          373,
+          99
+        ],
+        "part": null
+      },
+      "occluder_box_px": [
+        253,
+        97,
+        428,
+        211
+      ],
+      "review_boxes_px": {
+        "housing": [
+          75,
+          31,
+          467,
+          270
+        ],
+        "marker": [
+          312,
+          47,
+          373,
+          99
+        ],
+        "part": [
+          253,
+          97,
+          428,
+          211
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "rov_recovery-part-occluded",
+      "panel": 4,
+      "source_frame": "crops/rov_recovery-part-occluded-p4.png",
+      "frame_sha256": "360eeefd15224ed0ca4621216a2d0454aa56e0ece63d5eaf061eec1e001b0aed",
+      "source_image_sha256": "47560fc9e2b7a063add74f4af79a2a321efc3c9b14d9ec0991f981ab132d8a68",
+      "condition": "part_occluded",
+      "marker_shape": "triangle",
+      "marker_owner": "device",
+      "part_visibility": "occluded",
+      "boxes_px": {
+        "housing": [
+          76,
+          31,
+          463,
+          265
+        ],
+        "marker": [
+          319,
+          46,
+          378,
+          98
+        ],
+        "part": null
+      },
+      "occluder_box_px": [
+        278,
+        98,
+        442,
+        200
+      ],
+      "review_boxes_px": {
+        "housing": [
+          76,
+          31,
+          463,
+          265
+        ],
+        "marker": [
+          319,
+          46,
+          378,
+          98
+        ],
+        "part": [
+          278,
+          98,
+          442,
+          200
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "rov_recovery-marker-on-other-object",
+      "panel": 1,
+      "source_frame": "crops/rov_recovery-marker-on-other-object-p1.png",
+      "frame_sha256": "77717b6997233a18d70ecde02e0615f8f637f8108b198ecc899e7eacfbb4daca",
+      "source_image_sha256": "5664af034191ef0eb77e131158c1532ea4d4ab97034bfcb629b9b24e8c2192bb",
+      "condition": "marker_on_other_object",
+      "marker_shape": "triangle",
+      "marker_owner": "separate_sign",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          121,
+          44,
+          464,
+          262
+        ],
+        "marker": [
+          56,
+          105,
+          102,
+          149
+        ],
+        "part": [
+          302,
+          128,
+          410,
+          160
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          121,
+          44,
+          464,
+          262
+        ],
+        "marker": [
+          56,
+          105,
+          102,
+          149
+        ],
+        "part": [
+          302,
+          128,
+          410,
+          160
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "rov_recovery-marker-on-other-object",
+      "panel": 2,
+      "source_frame": "crops/rov_recovery-marker-on-other-object-p2.png",
+      "frame_sha256": "4549f5327b85e8b61316a3a18d8bfd1036064fc3100d733f129455cf97fde8a7",
+      "source_image_sha256": "5664af034191ef0eb77e131158c1532ea4d4ab97034bfcb629b9b24e8c2192bb",
+      "condition": "marker_on_other_object",
+      "marker_shape": "triangle",
+      "marker_owner": "separate_sign",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          114,
+          38,
+          480,
+          260
+        ],
+        "marker": [
+          27,
+          106,
+          84,
+          156
+        ],
+        "part": [
+          316,
+          122,
+          437,
+          151
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          114,
+          38,
+          480,
+          260
+        ],
+        "marker": [
+          27,
+          106,
+          84,
+          156
+        ],
+        "part": [
+          316,
+          122,
+          437,
+          151
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "rov_recovery-marker-on-other-object",
+      "panel": 3,
+      "source_frame": "crops/rov_recovery-marker-on-other-object-p3.png",
+      "frame_sha256": "2c4d5bd01c8ac4b57d09f8efd59d4b1774e5ed5270742f950ffb9033137301a3",
+      "source_image_sha256": "5664af034191ef0eb77e131158c1532ea4d4ab97034bfcb629b9b24e8c2192bb",
+      "condition": "marker_on_other_object",
+      "marker_shape": "triangle",
+      "marker_owner": "separate_sign",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          111,
+          40,
+          480,
+          270
+        ],
+        "marker": [
+          50,
+          102,
+          97,
+          147
+        ],
+        "part": [
+          300,
+          128,
+          418,
+          161
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          111,
+          40,
+          480,
+          270
+        ],
+        "marker": [
+          50,
+          102,
+          97,
+          147
+        ],
+        "part": [
+          300,
+          128,
+          418,
+          161
+        ]
+      },
+      "expected_conflict_confirmation": false
+    },
+    {
+      "id": "rov_recovery-marker-on-other-object",
+      "panel": 4,
+      "source_frame": "crops/rov_recovery-marker-on-other-object-p4.png",
+      "frame_sha256": "729d3fd6bb6d775870249b024011e0aa350fcfdfba392b8b3fe110460d21b8f7",
+      "source_image_sha256": "5664af034191ef0eb77e131158c1532ea4d4ab97034bfcb629b9b24e8c2192bb",
+      "condition": "marker_on_other_object",
+      "marker_shape": "triangle",
+      "marker_owner": "separate_sign",
+      "part_visibility": "visible",
+      "boxes_px": {
+        "housing": [
+          116,
+          39,
+          478,
+          264
+        ],
+        "marker": [
+          37,
+          106,
+          90,
+          154
+        ],
+        "part": [
+          312,
+          125,
+          429,
+          156
+        ]
+      },
+      "occluder_box_px": null,
+      "review_boxes_px": {
+        "housing": [
+          116,
+          39,
+          478,
+          264
+        ],
+        "marker": [
+          37,
+          106,
+          90,
+          154
+        ],
+        "part": [
+          312,
+          125,
+          429,
+          156
+        ]
+      },
+      "expected_conflict_confirmation": false
+    }
+  ]
+}
