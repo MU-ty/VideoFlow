@@ -168,19 +168,21 @@ def capture_probe(server, model, question, panels, output, log):
         log.write(json.dumps(dict(probe=output.name, stage=stage, raw=raw)) + '\n')
         log.flush()
 
+    invalid = []
+    hashes = [digest(tile.read_bytes()) for tile in panels]
+    decision, witness = 'unknown', None
     for retry in (False, True):
+        stage = 'detect_retry' if retry else 'detect'
         raw = visual_reply(server, model, '', sheet, visibility_question=question, format_retry=retry)
-        record('detect_retry' if retry else 'detect', raw)
+        record(stage, raw)
         try:
             answer = parse_visual(raw)
+        except ValueError as error:
+            invalid.append(dict(stage=stage, error=str(error)))
+        else:
+            decision = answer['decision']
             break
-        except ValueError:
-            if retry:
-                raise ValueError(f'invalid detector output for {output.name}') from None
 
-    hashes = [digest(tile.read_bytes()) for tile in panels]
-    witness = None
-    decision = answer['decision']
     if decision == 'yes':
         index = answer['panel'] - 1
         prompt = ('Inspect this single source frame. Check identity, part, and position separately. '
@@ -188,15 +190,35 @@ def capture_probe(server, model, question, panels, output, log):
                   'If all three are yes, use panel 1 and describe the visible evidence. '
                   'Otherwise use a null panel. '
                   + question.replace('In any one panel, ', 'In this frame, '))
-        raw = image_reply(server, model, panels[index], prompt, VERIFY_SCHEMA)
-        record('verify_isolated_panel', raw)
-        verdict = parse_verification(raw)
-        if verdict and json.loads(raw)['panel'] != 1:
-            raise ValueError(f'invalid isolated-panel number for {output.name}')
-        decision = 'yes' if verdict else 'unknown'
-        if verdict:
-            witness = hashes[index]
-    return dict(panels=hashes, decision=decision, calls=calls, witness=witness)
+        decision = 'unknown'
+        for retry in (False, True):
+            stage = 'verify_isolated_panel_retry' if retry else 'verify_isolated_panel'
+            instruction = prompt
+            if retry:
+                instruction += (
+                    '\nUse exactly the keys identity, part, position, panel, and evidence. '
+                    'For a match, panel must be the integer 1 and evidence must name visible '
+                    'details linking the part to the specified object. Do not invent details. '
+                    'If you cannot provide visible evidence, use unknown for the uncertain '
+                    'checks, null for panel, and explain what you cannot confirm in evidence.'
+                )
+            raw = image_reply(server, model, panels[index], instruction, VERIFY_SCHEMA)
+            record(stage, raw)
+            try:
+                verdict = parse_verification(raw)
+                if verdict and json.loads(raw)['panel'] != 1:
+                    raise ValueError('a verified single frame must use panel 1')
+            except ValueError as error:
+                invalid.append(dict(stage=stage, error=str(error)))
+            else:
+                if verdict:
+                    decision = 'yes'
+                    witness = hashes[index]
+                break
+    result = dict(panels=hashes, decision=decision, calls=calls, witness=witness)
+    if invalid:
+        result['invalid_replies'] = invalid
+    return result
 
 
 def main():

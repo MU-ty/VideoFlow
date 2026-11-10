@@ -1,10 +1,14 @@
 """Check scope, frame provenance, and paired evidence accounting."""
+from io import StringIO
+import json
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'research/dependency_probe'))
-from vision_evidence_reuse import compare
+from vision_evidence_reuse import capture_probe, compare, digest
 
 
 def edit(identifier, panels, *, question='striped press wheel', shot='S1', decision='yes', witness=None):
@@ -46,3 +50,47 @@ class VisualEvidenceReuseTests(unittest.TestCase):
                       edit('bad', ['A'], witness='A', decision='unknown')):
             with self.subTest(probe=probe), self.assertRaises(ValueError):
                 compare([probe], evidence='test')
+
+
+    def run_capture(self, verifier, detector=None):
+        detection = '{"decision":"yes","panel":2,"evidence":"visible part"}'
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            panels = [root / f'panel{i}.png' for i in range(1, 5)]
+            for panel in panels:
+                panel.write_bytes(panel.name.encode())
+            with patch('vision_evidence_reuse.ffmpeg'), patch(
+                'vision_evidence_reuse.visual_reply', side_effect=detector or [detection]
+            ), patch('vision_evidence_reuse.image_reply', side_effect=verifier):
+                log = StringIO()
+                result = capture_probe('', '', 'target', panels, root / 'shot', log)
+        return result, [json.loads(line)['stage'] for line in log.getvalue().splitlines()]
+
+    def test_retries_single_frame_match_without_evidence(self):
+        replies = [
+            '{"identity":"yes","part":"yes","position":"yes","panel":null,"evidence":""}',
+            '{"identity":"yes","part":"yes","position":"yes","panel":1,"evidence":"marked part"}',
+        ]
+        result, stages = self.run_capture(replies)
+        self.assertEqual(stages, ['detect', 'verify_isolated_panel', 'verify_isolated_panel_retry'])
+        self.assertEqual(result['calls'], 3)
+        self.assertEqual(result['witness'], digest(b'panel2.png'))
+        self.assertEqual(len(result['invalid_replies']), 1)
+
+    def test_invalid_verification_stays_unresolved(self):
+        replies = [
+            '{"identity":"yes","part":"yes","position":"yes","panel":2,"evidence":"marked part"}',
+            '{"identity":"yes","part":"yes","position":"yes","panel":1,"evidence":" "}',
+        ]
+        result, stages = self.run_capture(replies)
+        self.assertEqual(result['calls'], len(stages))
+        self.assertEqual(result['decision'], 'unknown')
+        self.assertIsNone(result['witness'])
+        self.assertEqual(len(result['invalid_replies']), 2)
+
+    def test_invalid_detector_stays_unresolved_without_verification(self):
+        result, stages = self.run_capture([], detector=['{}', 'bad JSON'])
+        self.assertEqual(stages, ['detect', 'detect_retry'])
+        self.assertEqual(result['decision'], 'unknown')
+        self.assertIsNone(result['witness'])
+        self.assertEqual(len(result['invalid_replies']), 2)

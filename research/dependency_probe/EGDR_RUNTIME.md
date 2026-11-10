@@ -122,3 +122,7 @@ Use `--story station_intercom` or `--story weather_beacon` to capture separately
 Use `--prepare-only` to generate `sampling.json` and the decoded frames without an
 Ollama instance. A live run writes `report.json` and `responses.jsonl`. The resampled
 frame indices, source digests and selected witness digests are included for audit.
+
+A malformed detector or single-frame verifier reply gets one format retry. Each attempt
+is counted and archived. If both replies are invalid, the shot remains unresolved with
+no reusable witness. The probe retains the validation failures in `invalid_replies`.
