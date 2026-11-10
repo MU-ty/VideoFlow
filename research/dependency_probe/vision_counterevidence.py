@@ -47,6 +47,7 @@ STATION_QUESTION = (
     'with an ivory triangular badge visible? An ivory plus-shaped badge marks a different intercom.'
 )
 FIXTURE = Path(__file__).with_name('fixtures') / 'egdr_evidence_resampling_v1.zip'
+HOLDOUT_FIXTURE = FIXTURE.with_name('egdr_observation_holdout_v1.zip')
 
 OBSERVATION_PROMPT = (
     'Record visual facts for each of the {panels} source panels. '
@@ -201,9 +202,24 @@ def prepare_cases(lamp, output):
     return cases
 
 
+def prepare_holdout(output):
+    with ZipFile(HOLDOUT_FIXTURE) as bundle:
+        protocol = json.loads(bundle.read('protocol.json'))
+        for case in protocol['cases']:
+            image = case['image']
+            if Path(image).name != image:
+                raise ValueError('holdout image name must be a basename')
+            data = bundle.read(image)
+            if sha256(data).hexdigest() != case['image_sha256']:
+                raise ValueError(f'holdout image digest mismatch: {image}')
+            (output / image).write_bytes(data)
+    protocol['fixture_sha256'] = sha256(HOLDOUT_FIXTURE.read_bytes()).hexdigest()
+    return protocol
+
+
 def summarize(rows, variant='counterevidence'):
     report = {}
-    for group in ('lamp_regression', 'station_transfer'):
+    for group in dict.fromkeys(row['group'] for row in rows):
         for method in ('baseline', variant):
             subset = [row for row in rows if row['group'] == group and row['method'] == method]
             report.setdefault(group, {})[method] = dict(
@@ -224,7 +240,7 @@ def summarize(rows, variant='counterevidence'):
     return report
 
 
-def evaluate(cases, args, log):
+def evaluate(cases, args, log, observation_rules=OBSERVATION_RULES):
     rows = []
     for index, case in enumerate(cases):
         methods = ('baseline', args.variant)
@@ -235,7 +251,7 @@ def evaluate(cases, args, log):
                 instruction = SINGLE_BASELINE if case['panels'] == 1 else VERIFY_INSTRUCTIONS
                 prompt, schema = instruction + case['question'], VERIFY_SCHEMA
             elif method == 'observations':
-                rules = OBSERVATION_RULES[case['group']]
+                rules = observation_rules[case['group']]
                 prompt = OBSERVATION_PROMPT.format(panels=case['panels'], **rules)
                 schema = observation_schema(case['panels'])
             else:
@@ -269,25 +285,32 @@ def evaluate(cases, args, log):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--lamp-run', type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument('--lamp-run', type=Path)
+    source.add_argument('--holdout', action='store_true',
+                        help='run the frozen observation policy on the two rendered holdouts')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--server', default='http://127.0.0.1:11434')
     parser.add_argument('--model', default='qwen2.5vl:7b-ctx8k')
-    parser.add_argument('--variant', choices=('counterevidence', 'observations'),
-                        default='counterevidence')
+    parser.add_argument('--variant', choices=('counterevidence', 'observations'))
     parser.add_argument('--prepare-only', action='store_true')
     args = parser.parse_args()
+    args.variant = args.variant or ('observations' if args.holdout else 'counterevidence')
     args.output.mkdir(parents=True, exist_ok=False)
-    cases = prepare_cases(args.lamp_run, args.output)
-    protocol = dict(model=args.model, cases=cases, model_options=dict(seed=42, temperature=0),
+    protocol = prepare_holdout(args.output) if args.holdout else {}
+    cases = protocol['cases'] if args.holdout else prepare_cases(args.lamp_run, args.output)
+    observation_rules = protocol.get('observation_rules', OBSERVATION_RULES)
+    protocol.update(model=args.model, cases=cases, model_options=dict(seed=42, temperature=0),
                     decision_policy='retain on match or unknown, exclude on distinct',
-                    transfer_note='previously used rendered station clips plus mixed and masked controls',
+                    transfer_note=('newly rendered holdout stories with predeclared labels'
+                                   if args.holdout else 'previously used rendered station clips '
+                                   'plus mixed and masked controls'),
                     prompts=dict(single_baseline=SINGLE_BASELINE, baseline=VERIFY_INSTRUCTIONS,
                                  counterevidence=INSTRUCTIONS),
                     schemas=dict(baseline=VERIFY_SCHEMA, counterevidence=SCHEMA))
     if args.variant == 'observations':
         protocol.update(
-            variant=args.variant, observation_rules=OBSERVATION_RULES,
+            variant=args.variant, observation_rules=observation_rules,
             observation_prompt=OBSERVATION_PROMPT,
             observation_schemas={count: observation_schema(count) for count in (1, 4)},
             observation_policy='match on any bound target; distinct only if every sampled '
@@ -298,7 +321,7 @@ def main():
         print(f'Prepared {len(cases)} cases')
         return
     with (args.output / 'responses.jsonl').open('w') as log:
-        rows = evaluate(cases, args, log)
+        rows = evaluate(cases, args, log, observation_rules)
     report = dict(model_calls=len(rows), metrics=summarize(rows, args.variant))
     result = json.dumps(report, indent=2)
     (args.output / 'report.json').write_text(result + '\n')
