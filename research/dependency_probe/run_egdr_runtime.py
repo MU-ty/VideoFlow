@@ -7,13 +7,14 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from artifacts import archive_current, write_json
+from artifacts import archive_current, checksum, write_json
 from asset_runtime import AssetRuntime, Conflict, fingerprint
 from asset_worker import build_h3, pass_once
 from comfyui import ComfyUI
 from provider_audit import capture_environment, summarize_inspections
 from vision_probe import collect_selections, make_sheet
 from vision_evidence_reuse import capture_probe, ffmpeg
+import egdr_radio_holdout as radio
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from video_edit_ablation import asset, wait_for
@@ -90,7 +91,35 @@ def lamp_inputs(seed):
     return color_manifest(shots, seed), case, question
 
 
-STORIES = {'striped-press': pilot_inputs, 'hexagon-lamp': lamp_inputs}
+def radio_inputs(seed):
+    target = 'a mint-green portable field radio with a large white X on its own front face'
+    part = 'a thick yellow carry handle above the radio'
+    shots = {
+        'S1': f'Steady frontal close-up of {target} with {part}. '
+              'Keep the entire handle and white X visible on a wooden workbench.',
+        'S2': 'Steady frontal view of a different mint-green field radio with a large white '
+              'circle on its front face and a thick yellow carry handle on top. Both are visible.',
+        'S3': f'Steady three-quarter view of {target} with {part} on a wooden shelf. '
+              'Keep the entire handle and white X visible.',
+        'S4': 'Steady close-up of a closed maroon notebook alone on a shelf. No radio is visible.',
+    }
+    edit = (
+        f'Recolor only the thick yellow carry handle of {target} to cobalt blue wherever visible. '
+        'Preserve the mint-green body and white X. Leave the circle-marked radio and notebook '
+        'unchanged. Do not add radios or handles where absent.'
+    )
+    question = (
+        'In any single source panel, is there a thick yellow carry handle visibly attached '
+        'to a mint-green field radio whose own front face has a large white X? '
+        'A white circle or a mark on another object does not count.'
+    )
+    return color_manifest(shots, seed), dict(
+        id=radio.STORY, entity=f'carry handle of {target}', attribute='color',
+        edit=edit, shots=shots, declared=['S1'],
+    ), question
+
+
+STORIES = {'striped-press': pilot_inputs, 'hexagon-lamp': lamp_inputs, radio.STORY: radio_inputs}
 LAMP_ORACLE = {
     'source': {
         'S1': 'Silver dome shade and black hexagon visibly belong to the same lamp',
@@ -130,13 +159,11 @@ LAMP_REFERENCE_REGIONS = {
 }
 
 
-def make_lamp_reference(clip, output, shot):
-    from artifacts import checksum
+def make_conditioned_reference(clip, output, shot, expected, outline, region_name):
     from run_egdr_reference_pair import HEIGHT, WIDTH, ffmpeg as rgb_ffmpeg, polygon_spans
 
-    expected, outline = LAMP_REFERENCE_REGIONS[shot]
     if checksum(clip) != expected:
-        raise ValueError(f'{shot}: lamp reference contour is calibrated to different source bytes')
+        raise ValueError(f'{shot}: reference contour is calibrated to different source bytes')
     raw = rgb_ffmpeg('-i', clip, '-map', '0:v:0', '-frames:v', 1, '-pix_fmt', 'rgb24',
                      '-threads', 1, '-f', 'rawvideo', 'pipe:1')
     if len(raw) != WIDTH * HEIGHT * 3:
@@ -152,21 +179,26 @@ def make_lamp_reference(clip, output, shot):
                 red = (min(255, light * 5 // 4), light * 3 // 16, light * 4 // 16)
                 changed += tuple(raw[i:i + 3]) != red
                 edited[i:i + 3] = bytes(red)
+    if not changed:
+        raise ValueError(f'{shot}: reference contour changed zero pixels')
     rgb_ffmpeg('-f', 'rawvideo', '-pixel_format', 'rgb24', '-video_size', f'{WIDTH}x{HEIGHT}',
                '-i', 'pipe:0', '-frames:v', 1, '-threads', 1, output, data=edited)
     return dict(sha256=checksum(output), source_video_sha256=expected, frame_index=0,
-                shade_outline=outline, changed_pixels=changed, file=output.name)
+                changed_pixels=changed, file=output.name, **{region_name: outline})
 
 
-def prepare_lamp_builder(root, source, backend):
+def prepare_conditioned_builder(root, source, backend, regions, story):
     from recovery_reference_comfy import check_backend, upload_frame
     from run_egdr_reference_pair import condition
 
     check_backend(backend)
     references = {}
-    for shot in LAMP_REFERENCE_REGIONS:
-        path = root / f'{shot}-lamp-reference.png'
-        references[shot] = make_lamp_reference(root / 'source' / source[shot]['file'], path, shot)
+    lamp = story == 'hexagon-lamp'
+    region_name = 'shade_outline' if lamp else 'handle_outline'
+    for shot, (digest, outline) in regions.items():
+        path = root / f'{shot}-{"lamp" if lamp else "radio"}-reference.png'
+        references[shot] = make_conditioned_reference(
+            root / 'source' / source[shot]['file'], path, shot, digest, outline, region_name)
     for shot, entry in references.items():
         entry['provider_image'] = upload_frame(backend, root / entry['file'], entry['sha256'])
     write_json(root / 'reference_plan.json', references)
@@ -179,12 +211,16 @@ def prepare_lamp_builder(root, source, backend):
         prompt = graph['5']['inputs']['prompt']
         scene, separator, _ = prompt.partition(' Apply the following appearance instruction')
         if not separator:
-            raise ValueError('missing lamp appearance slot')
-        graph['5']['inputs']['prompt'] = (
-            scene.replace('solid silver metal dome shade', 'scarlet red metal dome shade')
-            + ' Keep the shade scarlet red from the first visible frame through the end. '
-            'Preserve the cream base, black hexagon, desk, and background.'
-        )
+            raise ValueError('missing appearance slot')
+        if lamp:
+            scene = (scene.replace('solid silver metal dome shade', 'scarlet red metal dome shade')
+                     + ' Keep the shade scarlet red from the first visible frame through the end. '
+                       'Preserve the cream base, black hexagon, desk, and background.')
+        else:
+            scene = (scene.replace('thick yellow carry handle', 'thick scarlet red carry handle')
+                     + ' Keep the carry handle scarlet red from the first visible frame through the end. '
+                       'Preserve the mint-green body, white X, and background.')
+        graph['5']['inputs']['prompt'] = scene
         return condition(graph, entry['provider_image'])
     return build
 
@@ -280,11 +316,18 @@ def run(args):
     if args.story == 'hexagon-lamp':
         # Keep the predeclared evaluation labels out of all model inputs.
         write_json(args.output / 'visual_oracle.json', LAMP_ORACLE)
+    protocol_fields = ({
+        'holdout_protocol_sha256': checksum(radio.PROTOCOL),
+        'reference_regions_sha256': checksum(args.reference_regions) if args.reference_regions else None,
+        'oracle_labels_sha256': checksum(args.oracle_labels) if args.oracle_labels else None,
+    }
+                       if args.story == radio.STORY else {})
     write_json(args.output / 'protocol.json', dict(story=args.story, seed=args.seed, manifest=manifest, case=case,
                question=question, policies=args.policies, text_model=args.text_model,
                vision_model=args.vision_model, frame_notes=bool(args.frame_notes), timeout=args.timeout,
                server=backend.base, continuous=args.continuous,
-               lamp_reference_frames=args.lamp_reference_frames, oracle_labels=bool(args.oracle_labels)))
+               lamp_reference_frames=args.lamp_reference_frames, oracle_labels=bool(args.oracle_labels),
+               **protocol_fields))
     if args.source_run:
         source_protocol = json.loads((args.source_run / 'protocol.json').read_text(encoding='utf-8'))
         if source_protocol['manifest'] != manifest or source_protocol['server'] != backend.base:
@@ -303,6 +346,8 @@ def run(args):
             raise ValueError('source run must have published revision 1')
         before = archive_current(original, args.output / 'source', backend.base, probe=True)
         if args.source_run:
+            if args.story == radio.STORY:
+                radio.check_protocol(args.source_run)
             frozen = json.loads((args.source_run / 'source' / 'revision-1.json').read_text())
             if (before['timeline_hash'] != frozen['timeline_hash']
                     or {row['asset']: row['sha256'] for row in before['assets']}
@@ -321,8 +366,13 @@ def run(args):
             raise RuntimeError('evidence frames do not match the frozen source clips')
         if args.source_only:
             return
-        final_builder = (prepare_lamp_builder(args.output, source, backend)
-                         if args.lamp_reference_frames else build_h3)
+        regions = LAMP_REFERENCE_REGIONS if args.lamp_reference_frames else {}
+        if args.reference_regions:
+            regions = json.loads(args.reference_regions.read_text(encoding='utf-8'))
+            if set(regions) != set(radio.TARGETS):
+                raise ValueError('expected the two preregistered conditioned target shots')
+        final_builder = (prepare_conditioned_builder(args.output, source, backend, regions, args.story)
+                         if regions else build_h3)
         raw = []
         started = time.monotonic()
         if args.continuous:
@@ -401,7 +451,7 @@ def run(args):
                         return None
                     return runtime.snapshot()['timeline']
 
-                if args.lamp_reference_frames:
+                if regions:
                     wait_conditioned(folder, runtime, backend, final_builder, published, args.timeout, args.poll)
                 else:
                     wait_for(folder, runtime, backend, 'videoflow', published,
@@ -443,7 +493,7 @@ def run(args):
                                scheduled_jobs=len(jobs), video_outputs=sum(j['remote_state'] == 'succeeded'
                                                                           for j in measured_jobs),
                                stale_jobs=stale, obsolete_evidence_rejected=obsolete_evidence_rejected)
-                if args.lamp_reference_frames:
+                if regions:
                     references = json.loads((args.output / 'reference_plan.json').read_text())
                     bindings = {}
                     for job in jobs:
@@ -488,6 +538,8 @@ def main():
     parser.add_argument('--seed', type=int, default=88001)
     parser.add_argument('--lamp-reference-frames', action='store_true',
                         help='use the verified seed-88101 shade contours for final target renders')
+    parser.add_argument('--reference-regions', type=Path,
+                        help='verified radio source digests and first-frame handle contours')
     parser.add_argument('--frame-notes', type=Path,
                         help='optional independent observations from this seed, keyed by shot')
     source = parser.add_mutually_exclusive_group()
@@ -502,6 +554,16 @@ def main():
     if args.lamp_reference_frames and not (args.story == 'hexagon-lamp' and args.seed == 88101
                                             and args.source_run and args.continuous):
         parser.error('--lamp-reference-frames requires --story hexagon-lamp --seed 88101 --source-run and --continuous')
+    if args.story == radio.STORY:
+        if (args.seed, args.timeout, args.poll) != (radio.SEED, 1800, 3) or args.frame_notes:
+            parser.error('the radio holdout requires the frozen seed, timeout, poll and no frame notes')
+        if not args.source_only and not (args.source_run and args.continuous and args.oracle_labels
+                                         and args.reference_regions
+                                         and tuple(args.policies) == radio.POLICIES
+                                         and args.vision_model == 'qwen2.5vl:7b-ctx8k'):
+            parser.error('the radio holdout requires the frozen four-arm conditioned protocol')
+    elif args.reference_regions:
+        parser.error('--reference-regions is only supported by the radio holdout')
     continuous_policies = {'worklist', 'full'} | DEFERRED_POLICIES
     if args.continuous and not set(args.policies) <= continuous_policies:
         parser.error('--continuous supports worklist, online_egdr, oracle_egdr, and full')
