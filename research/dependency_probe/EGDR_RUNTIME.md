@@ -70,3 +70,19 @@ All policies share the same evidence and publication barrier. The waiting Workli
 | Superseded evidence | 11 / 3 | 10 / 4 | 10 / 4 |
 
 Cells give simulated ticks from the last edit to publication / submission intents after the initial fixture. All nine policy runs publish the expected final shot set. In the superseded trace, both online policies spend one extra intent on an obsolete render. The online policies have identical event logs apart from their policy names. These cases demonstrate the trade-off of overlapping evidence acquisition with rendering. A comparative EGDR benefit would require evidence that improves the selection or arrives with lower verification cost on independent stories, or a broader execution experiment with a measured difference under the same evidence.
+
+## Reusing visual evidence across edits
+
+The experiment compares independent policies over a shared capture of fresh visual replies. All policies use the same source-only question and verify a positive before selecting a shot. The destination color is kept outside that question. The exact-source policy caches verified positives for the same story, shot, question, and ordered source panels. The witness policy also permits reuse after a source change if the single frame independently verified for identity, part, and position is still present with identical bytes. Its claim is existential visibility within the supplied frames. Negatives and unknowns are rechecked. The experiment never reuses a witness for a different shot or question.
+
+A retrospective replay of the existing microscope and sewing-machine logs checks eight source sheet hashes. It replays the six original edits and two unchanged-source destination-color changes. The two added edits replay identical requests and recorded replies. They are not independent model observations. Across this schedule, fresh probing accounts for 55 calls, including format retries. Each reuse policy accounts for 47 calls with 4 cache hits and the same 2 misses, 4 excess selections, and 8 unresolved pairs. The archival verifier used whole sheets, so these data only test exact-source reuse. The repeated stitch-selector edit retains the original model's incorrect selection.
+
+To capture the new boundary controls on the school server, use Ollama and FFmpeg. The script unpacks the repository's four-shot Blender control. It records paired responses for six conditions covering a destination-color change, a target switch, replacement of a nonwitness panel, replacement of a shot's source, and complete occlusion of a shot's sampled panels. It uses a separate single-frame verification call for new positive witnesses.
+
+```bash
+python3 -u research/dependency_probe/vision_evidence_reuse.py live \
+  --server http://127.0.0.1:11434 --model qwen2.5vl:7b-ctx8k \
+  --output runs/egdr-evidence-reuse-live-01
+```
+
+`responses.jsonl` stores actual detector and verifier replies. `report.json` scores each arm and reports the model calls each policy would require with those replies. The capture deliberately queries even requests a cache would skip, so the totals are counterfactual call counts. This protocol measures visibility and selection for the supplied panels. H3 rendering and the production runtime are outside the experiment.
