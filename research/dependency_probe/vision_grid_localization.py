@@ -1,7 +1,8 @@
-"""Evaluate grid-based localization and a spatial veto on fixed candidate shots."""
+"""Compare localization backends with the same veto and review on fixed shots."""
 import argparse
 from hashlib import sha256
 import json
+from math import ceil, floor, isfinite
 from pathlib import Path
 from time import monotonic
 
@@ -38,6 +39,55 @@ GRID_PROMPT = (
     'Use null for a region you cannot see or cannot localize. Do not move a region '
     'into the housing just because it is nearby.'
 )
+DETECTOR_CHECKPOINT = 'IDEA-Research/grounding-dino-tiny'
+DETECTOR_THRESHOLD = .30
+DETECTOR_TEXT_THRESHOLD = .25
+DETECTOR_QUERIES = {
+    'housing': '{housing}',
+    'marker': 'a geometric badge or symbol',
+    'part': '{part}',
+}
+
+
+class DetectorLocalizer:
+    """Detect each role independently before applying any geometric constraint."""
+
+    def __init__(self, checkpoint, device):
+        import torch
+        from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
+
+        self.torch = torch
+        self.device = device
+        self.processor = AutoProcessor.from_pretrained(checkpoint)
+        self.model = AutoModelForZeroShotObjectDetection.from_pretrained(
+            checkpoint, use_safetensors=True).to(device).eval()
+
+    def locate(self, frame, rules):
+        boxes, detections = {}, {}
+        with Image.open(frame) as source:
+            image = source.convert('RGB')
+        for role, template in DETECTOR_QUERIES.items():
+            phrase = template.format(**rules)
+            inputs = self.processor(images=image, text=phrase.lower() + '.',
+                                    return_tensors='pt').to(self.device)
+            with self.torch.inference_mode():
+                outputs = self.model(**inputs)
+            result, = self.processor.post_process_grounded_object_detection(
+                outputs, inputs.input_ids, threshold=DETECTOR_THRESHOLD,
+                text_threshold=DETECTOR_TEXT_THRESHOLD, target_sizes=[image.size[::-1]])
+            candidates = []
+            for raw, confidence in zip(result['boxes'].tolist(), result['scores'].tolist()):
+                if not all(isfinite(value) for value in [*raw, confidence]):
+                    continue
+                x1, y1, x2, y2 = raw
+                box = (max(0, floor(x1)), max(0, floor(y1)),
+                       min(image.width, ceil(x2)), min(image.height, ceil(y2)))
+                if box[0] < box[2] and box[1] < box[3]:
+                    candidates.append(dict(box_px=box, score=confidence))
+            candidates.sort(key=lambda candidate: candidate['score'], reverse=True)
+            detections[role] = dict(query=phrase, candidates=candidates)
+            boxes[role] = candidates[0]['box_px'] if candidates else None
+        return boxes, detections
 
 
 def make_grid(frame, output):
@@ -102,15 +152,20 @@ def box_iou(predicted, reference):
     return overlap / ((x2 - x1) * (y2 - y1) + (a2 - a1) * (b2 - b1) - overlap)
 
 
-def localize_and_review(frame, grid, review, rules, args):
-    row = dict(confirmed=False, model_calls=1, boxes_px={})
-    row['localization_raw'] = image_reply(args.server, args.model, grid,
-                                          GRID_PROMPT.format(**rules), GRID_SCHEMA)
-    try:
-        boxes = grid_boxes(row['localization_raw'])
-    except ValueError as error:
-        row.update(stage='invalid_localization', error=str(error))
-        return row
+def localize_and_review(frame, grid, review, rules, args, detector=None):
+    row = dict(confirmed=False, model_calls=0, detector_calls=0, boxes_px={})
+    if detector is None:
+        row['model_calls'] = 1
+        row['localization_raw'] = image_reply(args.server, args.model, grid,
+                                              GRID_PROMPT.format(**rules), GRID_SCHEMA)
+        try:
+            boxes = grid_boxes(row['localization_raw'])
+        except ValueError as error:
+            row.update(stage='invalid_localization', error=str(error))
+            return row
+    else:
+        boxes, row['detections'] = detector.locate(frame, rules)
+        row['detector_calls'] = len(DETECTOR_QUERIES)
     row['boxes_px'] = boxes
     row['stage'] = spatial_status(boxes)
     if row['stage'] != 'pass':
@@ -139,24 +194,36 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--server', default='http://127.0.0.1:11434')
     parser.add_argument('--model', default='qwen2.5vl:7b-ctx8k')
+    parser.add_argument('--localizer', choices=('grid', 'grounding-dino'), default='grid')
+    parser.add_argument('--checkpoint', default=DETECTOR_CHECKPOINT)
+    parser.add_argument('--device', default='cuda')
     parser.add_argument('--prepare-only', action='store_true')
     args = parser.parse_args()
     frames, cases, rules_by_group = prepare_frames(args.source_run)
     args.output.mkdir(parents=True, exist_ok=False)
     grids, crops = (args.output / name for name in ('grids', 'crops'))
-    grids.mkdir()
     crops.mkdir()
     protocol = dict(model=args.model, cell_size_px=CELL, columns=COLS, rows=ROWS,
                     localization_prompt=GRID_PROMPT, localization_schema=GRID_SCHEMA,
                     review_prompt=REVIEW_PROMPT, review_schema=REVIEW_SCHEMA,
                     gate='all four frames must pass spatial veto and crop review', frames=frames)
+    protocol['localizer'] = args.localizer
+    if args.localizer == 'grounding-dino':
+        for key in ('cell_size_px', 'columns', 'rows', 'localization_prompt', 'localization_schema'):
+            del protocol[key]
+        protocol.update(checkpoint=args.checkpoint, device=args.device, queries=DETECTOR_QUERIES,
+                        detector_threshold=DETECTOR_THRESHOLD, text_threshold=DETECTOR_TEXT_THRESHOLD,
+                        selection='highest detector score per role before spatial veto')
     (args.output / 'protocol.json').write_text(json.dumps(protocol, indent=2) + '\n')
-    for a in frames:
-        frame = args.source_run / a['source_frame']
-        make_grid(frame, grids / frame.name)
+    if args.localizer == 'grid':
+        grids.mkdir()
+        for a in frames:
+            frame = args.source_run / a['source_frame']
+            make_grid(frame, grids / frame.name)
     if args.prepare_only:
-        print(f'Prepared {len(frames)} grid images')
+        print(f'Prepared {len(frames)} frames for {args.localizer}')
         return
+    detector = DetectorLocalizer(args.checkpoint, args.device) if args.localizer == 'grounding-dino' else None
 
     results, shots = [], {}
     with (args.output / 'review.jsonl').open('w') as log:
@@ -166,10 +233,12 @@ def main():
             print(f"{a['id']} panel {a['panel']}", flush=True)
             start = monotonic()
             row = localize_and_review(frame, grid, crops / frame.name,
-                                      rules_by_group[cases[a['id']]['group']], args)
+                                      rules_by_group[cases[a['id']]['group']], args, detector)
             row.update(id=a['id'], panel=a['panel'], condition=a['condition'],
                        expected=a['expected_conflict_confirmation'], frame_sha256=a['frame_sha256'],
-                       grid_sha256=sha256(grid.read_bytes()).hexdigest(), seconds=monotonic() - start)
+                       seconds=monotonic() - start)
+            if detector is None:
+                row['grid_sha256'] = sha256(grid.read_bytes()).hexdigest()
             row['iou'] = {role: box_iou(row['boxes_px'].get(role), ref)
                           for role, ref in a['boxes_px'].items() if ref is not None}
             row['localized_hidden_part'] = (a['boxes_px']['part'] is None
@@ -190,14 +259,16 @@ def main():
         group = [row for row in results if row['condition'] == condition]
         scores['stage_counts'] = {stage: sum(row['stage'] == stage for row in group)
                                   for stage in sorted({row['stage'] for row in group})}
-        scores['crop_review_calls'] = sum(row['model_calls'] - 1 for row in group)
+        scores['crop_review_calls'] = sum('review_raw' in row for row in group)
         scores['localized_hidden_parts'] = sum(row['localized_hidden_part'] for row in group)
         scores['mean_iou'] = {}
         for role in ROLES:
             values = [row['iou'][role] for row in group if role in row['iou']]
             if values:
                 scores['mean_iou'][role] = sum(values) / len(values)
-    report = dict(model_calls=sum(row['model_calls'] for row in results),
+    report = dict(localizer=args.localizer,
+                  model_calls=sum(row['model_calls'] for row in results),
+                  detector_calls=sum(row['detector_calls'] for row in results),
                   frames=conditions, shots=score(shot_results, 'condition'),
                   shot_results=shot_results)
     text = json.dumps(report, indent=2)
