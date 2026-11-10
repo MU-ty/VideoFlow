@@ -1,4 +1,4 @@
-"""Prepare source annotations and a method-blinded review for the radio holdout."""
+"""Prepare source annotations and method-blinded reviews for conditioned holdouts."""
 
 import argparse
 import csv
@@ -17,6 +17,11 @@ TARGETS = ('S1', 'S3')
 SHOTS = ('S1', 'S2', 'S3', 'S4')
 POLICIES = ('worklist', 'oracle_egdr', 'online_egdr', 'full')
 PROTOCOL = Path(__file__).with_name('EGDR_RADIO_HOLDOUT.md')
+LUNCHBOX_STORY = 'star-lunchbox'
+HOLDOUTS = {
+    STORY: (SEED, PROTOCOL),
+    LUNCHBOX_STORY: (89201, PROTOCOL.with_name('EGDR_LUNCHBOX_HOLDOUT.md')),
+}
 FIELDS = ('clip', 'edit', 'unintended', 'timestamps_and_notes')
 
 
@@ -42,9 +47,12 @@ def verified_media(directory, revision):
 
 def check_protocol(root):
     protocol = load(root / 'protocol.json')
-    if protocol['story'] != STORY or protocol['seed'] != SEED:
-        raise ValueError('expected the preregistered radio story and seed')
-    if protocol['holdout_protocol_sha256'] != checksum(PROTOCOL):
+    if protocol['story'] not in HOLDOUTS:
+        raise ValueError('expected a preregistered holdout story')
+    seed, spec = HOLDOUTS[protocol['story']]
+    if protocol['seed'] != seed:
+        raise ValueError('expected the preregistered seed')
+    if protocol['holdout_protocol_sha256'] != checksum(spec):
         raise ValueError('the holdout protocol changed after this run was recorded')
     return protocol
 
@@ -118,7 +126,8 @@ def blind(run, output, key):
         writer.writerows((name, '', '', '') for name in mapping)
     (output / 'REVIEW.md').write_text(
         'Score all clips in numeric order against the same-shot source. '
-        'Keep your ratings independent.\n\n' + PROTOCOL.read_text().split('## Reviewer rubric\n', 1)[1]
+        'Keep your ratings independent.\n\n'
+        + HOLDOUTS[protocol['story']][1].read_text(encoding='utf-8').split('## Reviewer rubric\n', 1)[1]
         .split('\n## ', 1)[0], encoding='utf-8',
     )
 
