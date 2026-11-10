@@ -8,10 +8,12 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from artifacts import archive_current, write_json
-from asset_runtime import AssetRuntime, fingerprint
+from asset_runtime import AssetRuntime, Conflict, fingerprint
+from asset_worker import pass_once
 from comfyui import ComfyUI
 from provider_audit import capture_environment, summarize_inspections
 from vision_probe import collect_selections, make_sheet
+from vision_evidence_reuse import capture_probe, ffmpeg
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from video_edit_ablation import asset, wait_for
@@ -24,6 +26,8 @@ POLICIES = {
     'egdr': 'union_plus_verified',
     'egdr_conservative': 'union_plus_unresolved',
     'full': 'full',
+    'worklist': 'attr_dag',
+    'online_egdr': 'online_egdr',
 }
 KEY = 'target.color'
 ENTITY = 'ribbed amber handwheel on the cream press with two teal stripes'
@@ -56,15 +60,48 @@ def pilot_inputs(seed):
     return manifest, case, question
 
 
-def apply_policy(runtime, case, selected, source, evidence, policy):
+def apply_policy(runtime, case, selected, source, evidence, policy, expected_revision=1, *, continuous=False):
     target = case.get('target', 'S1')
-    repairs = [
-        dict(child=shot, source_input_hash=source[shot]['input_hash'],
-             evidence_sha256=fingerprint(dict(shot=shot, policy=policy, evidence=evidence)))
-        for shot in sorted(set(selected) - {target})
-    ]
-    return runtime.edit(dict(id=case['id'], expected_revision=1, target=target, key=KEY,
-                             value=case['edit'], scope='local', state_repairs=repairs))
+    event_id = case['id'] if expected_revision == 1 else f"{case['id']}-{expected_revision}"
+    event = dict(id=event_id, expected_revision=expected_revision, target=target, key=KEY,
+                 value=case['edit'], scope='local')
+    if policy == 'online_egdr':
+        event['evidence_candidates'] = sorted(set(source) - {target})
+    elif policy == 'full' and continuous:
+        # Assign the edit value to every authored binding without introducing
+        # artificial readiness edges in the full-regeneration baseline.
+        event.update(scope='global', method='full')
+    else:
+        repairs = [
+            dict(child=shot, source_input_hash=source[shot]['input_hash'],
+                 evidence_sha256=fingerprint(dict(shot=shot, policy=policy, evidence=evidence)))
+            for shot in sorted(set(selected) - {target})
+        ]
+        event.update(state_repairs=repairs, method='attr_dag' if policy == 'worklist' else 'dair')
+    return runtime.edit(event)
+
+
+def submit_anchor(folder, runtime, backend, epoch):
+    events = pass_once(runtime, backend, max_submit=1)
+    with (folder / 'worker.jsonl').open('a', encoding='utf-8') as out:
+        out.write(json.dumps(dict(at=time.time(), events=events)) + '\n')
+    if not any(j['asset'] == 'S1' and j['revision'] == epoch and j['status'] == 'submitted'
+               for j in runtime.active()):
+        raise RuntimeError(f'S1 epoch {epoch} did not reach the acknowledgement barrier')
+
+
+def source_probes(root, sheets, case, question, args, log):
+    probes = {}
+    for shot, sheet in sheets.items():
+        if shot in case['declared']:
+            continue
+        panels = []
+        for i, (x, y) in enumerate(((0, 0), (768, 0), (0, 432), (768, 432)), 1):
+            tile = root / f'{shot}-panel-{i}.png'
+            ffmpeg('-i', sheet, '-vf', f'crop=768:432:{x}:{y}', '-frames:v', 1, '-threads', 1, tile)
+            panels.append(tile)
+        probes[shot] = capture_probe(args.ollama, args.vision_model, question, panels, root / f'probe-{shot}', log)
+    return probes
 
 
 def run(args):
@@ -84,7 +121,7 @@ def run(args):
     write_json(args.output / 'protocol.json', dict(seed=args.seed, manifest=manifest, case=case,
                question=question, policies=args.policies, text_model=args.text_model,
                vision_model=args.vision_model, frame_notes=bool(args.frame_notes), timeout=args.timeout,
-               server=backend.base))
+               server=backend.base, continuous=args.continuous))
     if args.source_run:
         source_protocol = json.loads((args.source_run / 'protocol.json').read_text(encoding='utf-8'))
         if source_protocol['manifest'] != manifest or source_protocol['server'] != backend.base:
@@ -117,27 +154,35 @@ def run(args):
         if args.source_only:
             return
         raw = []
-        with (args.output / 'responses.jsonl').open('x', encoding='utf-8') as responses:
-            def log(row):
-                raw.append(row)
-                responses.write(json.dumps(row, ensure_ascii=False) + '\n')
+        started = time.monotonic()
+        if args.continuous:
+            with (args.output / 'responses.jsonl').open('x', encoding='utf-8') as responses:
+                probes = source_probes(args.output, sheets, case, question, args, responses)
                 responses.flush()
+            raw = [json.loads(line) for line in (args.output / 'responses.jsonl').read_text().splitlines()]
+            choices = dict(attr_dag=set(case['declared']), full=set(source), online_egdr=set(case['declared']))
+            audit = dict(probes=probes)
+        else:
+            with (args.output / 'responses.jsonl').open('x', encoding='utf-8') as responses:
+                def log(row):
+                    raw.append(row)
+                    responses.write(json.dumps(row, ensure_ascii=False) + '\n')
+                    responses.flush()
 
-            started = time.monotonic()
-            choices, audit = collect_selections(
-                case, sheets, args.ollama, args.text_model, args.vision_model, log,
-                visibility_question=question, verify_visual=True,
-            )
-            evidence_seconds = time.monotonic() - started
-        if 'union_plus_verified' in choices:
-            choices['union_plus_unresolved'] = (choices['union_plus_verified']
-                                                | set(audit['visual_unknown'])
-                                                | set(audit['verification_unknown']))
+                choices, audit = collect_selections(
+                    case, sheets, args.ollama, args.text_model, args.vision_model, log,
+                    visibility_question=question, verify_visual=True,
+                )
+            if 'union_plus_verified' in choices:
+                choices['union_plus_unresolved'] = (choices['union_plus_verified']
+                                                    | set(audit['visual_unknown'])
+                                                    | set(audit['verification_unknown']))
+            if audit['visual_invalid'] or audit['verification_invalid']:
+                raise RuntimeError('invalid evidence replies; inspect responses.jsonl before rendering arms')
+        evidence_seconds = time.monotonic() - started
         write_json(args.output / 'evidence.json', dict(frames=frames, audit=audit,
                    paired_probe_wall_seconds=evidence_seconds, responses_sha256=fingerprint(raw),
                    selections={key: sorted(value) for key, value in choices.items()}))
-        if audit['visual_invalid'] or audit['verification_invalid']:
-            raise RuntimeError('invalid evidence replies; inspect responses.jsonl before rendering arms')
         evidence = dict(frames=frames, responses=raw, case=case, question=question,
                         text_model=args.text_model, vision_model=args.vision_model)
         rows = []
@@ -148,31 +193,76 @@ def run(args):
             try:
                 original.db.backup(runtime.db)
                 selected = choices[POLICIES[policy]]
-                plan = apply_policy(runtime, case, selected, source, evidence, policy)
-                wait_for(folder, runtime, backend, 'videoflow', lambda: runtime.snapshot()['timeline'],
+                first = plan = apply_policy(runtime, case, selected, source, evidence, policy,
+                                            continuous=args.continuous)
+                repairs, obsolete_evidence_rejected = [], False
+                if args.continuous:
+                    submit_anchor(folder, runtime, backend, 2)
+                    runtime.close()
+                    runtime = AssetRuntime(folder / 'project.db')
+                    red = dict(case, edit=case['edit'].replace('cobalt blue', 'scarlet red'))
+                    plan = apply_policy(runtime, red, selected, source, evidence, policy,
+                                        expected_revision=2, continuous=True)
+                    submit_anchor(folder, runtime, backend, 3)
+                    if policy == 'online_egdr':
+                        for shot, probe in probes.items():
+                            decision = {'yes': 'match', 'no': 'distinct', 'unknown': 'fallback'}[probe['decision']]
+                            proof = fingerprint(dict(shot=shot, probe=probe, frame=frames[shot], evidence=evidence))
+                            if not obsolete_evidence_rejected:
+                                try:
+                                    runtime.resolve_evidence(2, shot, source[shot]['input_hash'], proof, decision)
+                                except Conflict:
+                                    obsolete_evidence_rejected = True
+                                else:
+                                    raise RuntimeError('superseded evidence was accepted')
+                            repairs.append(runtime.resolve_evidence(
+                                3, shot, source[shot]['input_hash'], proof, decision))
+                    write_json(folder / 'repair_trace.json', dict(first=first, second=plan, repairs=repairs,
+                               obsolete_evidence_rejected=obsolete_evidence_rejected))
+                def published():
+                    if args.continuous and runtime.unresolved_remote():
+                        return None
+                    return runtime.snapshot()['timeline']
+
+                wait_for(folder, runtime, backend, 'videoflow', published,
                          time.monotonic() + args.timeout, args.poll)
                 after = archive_current(runtime, folder / 'media', backend.base, probe=True)
                 reused = sorted(row['asset'] for row in after['assets']
                                 if all(row[field] == source[row['asset']][field]
                                        for field in ('input_hash', 'sha256', 'output')))
-                if set(reused) != set(source) - set(plan['regenerate']):
+                final_selection = set(plan['regenerate']).union(*(r['regenerate'] for r in repairs))
+                if set(reused) != set(source) - final_selection:
                     raise RuntimeError('published reuse disagrees with the committed plan')
                 snapshot = runtime.snapshot()
                 jobs = [job for job in snapshot['jobs'] if job['revision'] > 1]
                 history = summarize_inspections(runtime)
-                job_ids = {job['id'] for job in jobs}
+                measured_jobs = [job for job in jobs if job['submission_intents']] if args.continuous else jobs
+                job_ids = {job['id'] for job in measured_jobs}
                 edited_history = [item for item in history['jobs'] if item['job'] in job_ids]
                 spans = [item['execution_span_seconds'] for item in edited_history
                          if item['execution_span_seconds'] is not None]
-                edited_at = runtime.db.execute('SELECT applied_at FROM vf_events').fetchone()[0]
+                revision = plan['revision']
+                edited_at = runtime.db.execute(
+                    'SELECT applied_at FROM vf_events WHERE revision=?', (revision,)).fetchone()[0]
                 published_at = runtime.db.execute(
-                    'SELECT published_at FROM vf_timelines WHERE revision=2').fetchone()[0]
+                    'SELECT published_at FROM vf_timelines WHERE revision=?', (revision,)).fetchone()[0]
                 row = dict(policy=policy, plan=plan, reused=reused, video_outputs=len(jobs),
                            submission_intents=sum(job['submission_intents'] for job in jobs),
                            publication_seconds_after_edit=published_at - edited_at,
                            execution_spans_observed=len(spans),
-                           provider_execution_span_seconds=sum(spans) if len(spans) == len(jobs) else None,
+                           provider_execution_span_seconds=sum(spans) if len(spans) == len(measured_jobs) else None,
                            provider_history=history, quality='requires_independent_review')
+                if args.continuous:
+                    publications = [r[0] for r in runtime.db.execute('SELECT revision FROM vf_timelines ORDER BY revision')]
+                    events = [event for line in (folder / 'worker.jsonl').read_text().splitlines()
+                              for event in json.loads(line)['events']]
+                    stale = [event['job'] for event in events if event.get('result') == 'stale']
+                    if publications != [1, 3] or not stale:
+                        raise RuntimeError('continuous arm did not exercise obsolete completion and revision-3 publication')
+                    row.update(repairs=repairs, final_selection=sorted(final_selection), publications=publications,
+                               scheduled_jobs=len(jobs), video_outputs=sum(j['remote_state'] == 'succeeded'
+                                                                          for j in measured_jobs),
+                               stale_jobs=stale, obsolete_evidence_rejected=obsolete_evidence_rejected)
                 write_json(folder / 'report.json', row)
                 rows.append(row)
             finally:
@@ -192,6 +282,7 @@ def main():
     parser.add_argument('--vision-model', default='qwen2.5vl:7b')
     parser.add_argument('--policies', nargs='+', choices=tuple(POLICIES),
                         default=['declared', 'checklist', 'raw_union', 'egdr', 'full'])
+    parser.add_argument('--continuous', action='store_true', help='run the two-edit deferred-repair experiment')
     parser.add_argument('--seed', type=int, default=88001)
     parser.add_argument('--frame-notes', type=Path,
                         help='optional independent observations from this seed, keyed by shot')
@@ -204,6 +295,11 @@ def main():
     args = parser.parse_args()
     if not all(0 < value < float('inf') for value in (args.poll, args.timeout)):
         parser.error('timeout and poll must be finite and positive')
+    continuous_policies = {'worklist', 'online_egdr', 'full'}
+    if args.continuous and not set(args.policies) <= continuous_policies:
+        parser.error('--continuous requires --policies worklist online_egdr full (or a subset)')
+    if not args.continuous and 'online_egdr' in args.policies:
+        parser.error('online_egdr requires --continuous')
     if len(set(args.policies)) != len(args.policies):
         parser.error('policies must be unique')
     if not all(shutil.which(command) for command in ('ffmpeg', 'ffprobe')):

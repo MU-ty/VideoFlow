@@ -126,3 +126,39 @@ frame indices, source digests and selected witness digests are included for audi
 A malformed detector or single-frame verifier reply gets one format retry. Each attempt
 is counted and archived. If both replies are invalid, the shot remains unresolved with
 no reusable witness. The probe retains the validation failures in `invalid_replies`.
+
+## Two edits with deferred repair in the SQLite worker
+
+Each local DAIR edit can pin candidate shots to the input digests in the latest
+published manifest. A revision with unresolved candidates can render its declared
+closure, but the manifest remains gated. A newer edit of the same target and key
+can supersede it by re-pinning all candidates. A reply to the earlier revision
+cannot release the newer gate. An accepted positive adds a revision-scoped keyed
+state edge to the repair log and propagates from its child over the declared graph.
+Its resulting state inputs and generated-reference lineage use the normal
+fingerprint and epoch checks. An explicit fallback regenerates the candidate
+conservatively. A negative closes the candidate without adding an edge. Each
+candidate has one definitive resolution per revision. A new revision may resolve
+it differently. The runtime never infers generated-reference edges from visibility.
+
+The pilot below uses the same frozen press story and H3 backend in all three arms.
+It records a source-only VLM probe once, then delivers its verdicts to online EGDR
+after the second S1 acknowledgement. The delivery barrier is controlled. VLM
+latency is logged separately from edit-to-publication latency. The worker reopens
+SQLite between edits, and the experiment requires an observed stale completion and
+published revisions 1 and 3 only. The worklist sees only declared edges. Full
+regenerates every shot. The recorded pilot scope has authored prompt bindings;
+an unknown VLM decision is recorded as an explicit conservative fallback.
+
+```bash
+python3 -u research/dependency_probe/run_egdr_runtime.py \
+  --continuous --policies worklist online_egdr full \
+  --source-run runs/egdr-press-source-01 --seed 88001 \
+  --vision-model qwen2.5vl:7b-ctx8k --output runs/egdr-online-01
+```
+
+Omit `--source-run` to create the shared starting revision if its original provider
+artifacts are unavailable. The per-arm repair trace, worker events, raw probe
+replies, archived videos, and report separate submission intents, completed
+provider work, byte reuse, and publication latency. Provider execution spans
+include host work. Visual edit correctness requires review of the rendered outputs.

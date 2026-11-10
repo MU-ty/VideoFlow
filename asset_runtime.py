@@ -43,6 +43,10 @@ class AssetRuntime:
         CREATE TABLE IF NOT EXISTS vf_assets(id TEXT PRIMARY KEY, position INTEGER NOT NULL, scene TEXT NOT NULL, kind TEXT NOT NULL, spec TEXT NOT NULL, revision INTEGER NOT NULL, output TEXT, committed_hash TEXT);
         CREATE TABLE IF NOT EXISTS vf_jobs(id TEXT PRIMARY KEY, asset TEXT NOT NULL REFERENCES vf_assets(id), revision INTEGER NOT NULL, status TEXT NOT NULL, external_id TEXT, backend TEXT, input_json TEXT, execution_json TEXT, input_hash TEXT, output TEXT, error TEXT, UNIQUE(asset,revision));
         CREATE TABLE IF NOT EXISTS vf_events(id TEXT PRIMARY KEY, payload TEXT NOT NULL, revision INTEGER NOT NULL, plan TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS vf_evidence(
+            revision INTEGER NOT NULL, child TEXT NOT NULL REFERENCES vf_assets(id),
+            source_input_hash TEXT NOT NULL, decision TEXT, evidence_sha256 TEXT, result TEXT,
+            PRIMARY KEY(revision, child));
         CREATE TABLE IF NOT EXISTS vf_timelines(revision INTEGER PRIMARY KEY, entries TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS vf_provider_environment(id INTEGER PRIMARY KEY,backend TEXT NOT NULL,observed_at REAL NOT NULL,payload TEXT,error TEXT);
         CREATE TABLE IF NOT EXISTS vf_provider_inspections(id INTEGER PRIMARY KEY,job TEXT NOT NULL REFERENCES vf_jobs(id),backend TEXT NOT NULL,payload TEXT NOT NULL,first_seen_at REAL NOT NULL,UNIQUE(job,backend,payload));
@@ -149,6 +153,7 @@ class AssetRuntime:
             project = self._project()
             if event['expected_revision'] != project['revision']:
                 raise Conflict('project changed; reload before editing')
+            self._check_pending_evidence(project['revision'], event)
             assets = self._assets()
             specs = {a['id']:json.loads(a['spec']) for a in assets}
             if event['target'] not in specs or event['key'] not in specs[event['target']]['reads']:
@@ -156,40 +161,131 @@ class AssetRuntime:
             edges = json.loads(project['edges'])
             repairs = self._state_repairs(event, assets, specs, edges)
             edges.extend(repairs)
-            story = {'scenes':[dict(id=a['id'], cost=specs[a['id']]['cost'], reads=specs[a['id']]['reads']) for a in assets], 'edges':edges}
-            p = execution_plan(story, event, event.get('method','dair'))
-            selected = set(p.regenerate)
-            # State values propagate only across a matching state edge or within scope.
-            ids = [a['id'] for a in assets]
-            scope = event.get('scope', 'local')
-            eligible = set(ids if scope == 'global' else ids[ids.index(event['target']):] if scope == 'onward' else [event['target']])
-            state_changed = {a for a in eligible if event['key'] in specs[a]['reads']}
-            while True:
-                more = {e['child'] for e in edges if e['kind'] == 'state' and e['parent'] in state_changed and event['key'] in e['keys']}
-                if more <= state_changed:
-                    break
-                state_changed |= more
-            # Reject a local edit that would contradict a declared upstream state.
-            for e in edges:
-                if e['kind'] == 'state' and e['child'] in state_changed and event['key'] in e['keys']:
-                    parent_value = event['value'] if e['parent'] in state_changed else specs[e['parent']]['values'][event['key']]
-                    if parent_value != event['value']:
-                        raise Conflict('edit contradicts an upstream state dependency')
+            p = self._plan(assets, specs, edges, event)
+            state_changed = self._state_changes(assets, specs, edges, event)
             revision = project['revision'] + 1
-            for a in assets:
-                if a['id'] not in selected:
-                    continue
-                spec = specs[a['id']]
-                if a['id'] in state_changed:
-                    spec['values'][event['key']] = event['value']
-                self.db.execute("UPDATE vf_jobs SET status='superseded' WHERE asset=? AND status IN ('pending','submitting','submitted','unknown')", (a['id'],))
-                self.db.execute('UPDATE vf_assets SET spec=?, revision=revision+1, output=NULL, committed_hash=NULL WHERE id=?', (encode(spec), a['id']))
-                self._job(a['id'], a['revision']+1)
+            self._pin_evidence(event, assets, specs, revision)
+            self._invalidate(assets, specs, p.regenerate, state_changed, event)
             self.db.execute('UPDATE vf_project SET revision=?,edges=? WHERE id=1', (revision, encode(edges)))
             result = json.loads(encode(dict(asdict(p), revision=revision, state_changed=sorted(state_changed))))
             if repairs:
                 result['state_repairs'] = repairs
             self.db.execute('INSERT INTO vf_events(id,payload,revision,plan,applied_at) VALUES (?,?,?,?,?)', (event['id'], payload, revision, encode(result), time.time()))
+            self._publish()
+            return result
+
+    @staticmethod
+    def _plan(assets, specs, edges, event):
+        story = {'scenes': [dict(id=a['id'], cost=specs[a['id']]['cost'], reads=specs[a['id']]['reads'])
+                            for a in assets], 'edges': edges}
+        return execution_plan(story, event, event.get('method', 'dair'))
+
+    @staticmethod
+    def _state_changes(assets, specs, edges, event):
+        ids = [a['id'] for a in assets]
+        scope = event.get('scope', 'local')
+        eligible = ids if scope == 'global' else ids[ids.index(event['target']):] if scope == 'onward' else [event['target']]
+        key = event['key']
+        changed = {a for a in eligible if key in specs[a]['reads']}
+        while True:
+            more = {e['child'] for e in edges if e['kind'] == 'state' and e['parent'] in changed and key in e['keys']}
+            if more <= changed:
+                break
+            changed |= more
+        for e in edges:
+            if e['kind'] == 'state' and e['child'] in changed and key in e['keys']:
+                parent_value = event['value'] if e['parent'] in changed else specs[e['parent']]['values'][key]
+                if parent_value != event['value']:
+                    raise Conflict('edit contradicts an upstream state dependency')
+        return changed
+
+    def _invalidate(self, assets, specs, selected, changed, event):
+        selected = set(selected)
+        for a in assets:
+            aid = a['id']
+            if aid not in selected:
+                continue
+            spec = specs[aid]
+            if aid in changed:
+                spec['values'][event['key']] = event['value']
+            self.db.execute("UPDATE vf_jobs SET status='superseded' WHERE asset=? AND status IN ('pending','submitting','submitted','unknown')", (aid,))
+            self.db.execute('UPDATE vf_assets SET spec=?, revision=revision+1, output=NULL, committed_hash=NULL WHERE id=?', (encode(spec), aid))
+            self._job(aid, a['revision']+1)
+
+    def _check_pending_evidence(self, revision, event):
+        rows = self.db.execute('SELECT child, decision FROM vf_evidence WHERE revision=?',
+                               (revision,)).fetchall()
+        if not any(row['decision'] is None for row in rows):
+            return
+        previous = json.loads(self.db.execute('SELECT payload FROM vf_events WHERE revision=?',
+                                               (revision,)).fetchone()['payload'])
+        candidates = event.get('evidence_candidates')
+        if (not isinstance(candidates, list) or any(not isinstance(c, str) for c in candidates)
+                or not {row['child'] for row in rows}.issubset(candidates)
+                or (previous['target'], previous['key']) != (event['target'], event['key'])):
+            raise Conflict('pending evidence must be re-pinned for a superseding edit of the same target and key')
+
+    def _pin_evidence(self, event, assets, specs, revision):
+        candidates = event.get('evidence_candidates', [])
+        if not isinstance(candidates, list) or any(not isinstance(child, str) for child in candidates):
+            raise ValueError('evidence_candidates must be a list of shot IDs')
+        if not candidates:
+            return
+        if (len(set(candidates)) != len(candidates) or event.get('state_repairs')
+                or event.get('scope', 'local') != 'local' or event.get('method', 'dair') != 'dair'):
+            raise ValueError('deferred repair requires unique candidates and a local DAIR edit')
+        by_id = {a['id']: a for a in assets}
+        parent = by_id[event['target']]
+        source = self.db.execute('SELECT entries FROM vf_timelines ORDER BY revision DESC LIMIT 1').fetchone()
+        if not source or parent['kind'] != 'video':
+            raise Conflict('deferred repair requires a published video source')
+        hashes = {entry['asset']: entry['input_hash'] for entry in json.loads(source['entries'])}
+        for child in candidates:
+            a = by_id.get(child)
+            if (not a or a['kind'] != 'video' or a['position'] <= parent['position']
+                    or event['key'] not in specs[child]['reads']):
+                raise ValueError('deferred repair candidates require downstream video attribute bindings')
+            self.db.execute('INSERT INTO vf_evidence(revision,child,source_input_hash) VALUES (?,?,?)',
+                            (revision, child, hashes[child]))
+
+    def resolve_evidence(self, revision, child, source_input_hash, evidence_sha256, decision):
+        """Resolve one pinned candidate and expand the current edit atomically."""
+        if decision not in ('match', 'distinct', 'fallback'):
+            raise ValueError('expected a definite verdict or an explicit conservative fallback')
+        if not isinstance(evidence_sha256, str) or not re.fullmatch(r'[a-f0-9]{64}', evidence_sha256):
+            raise ValueError('invalid evidence digest')
+        with self.transaction():
+            project = self._project()
+            if revision != project['revision']:
+                raise Conflict('evidence refers to a superseded edit')
+            row = self.db.execute('SELECT * FROM vf_evidence WHERE revision=? AND child=?',
+                                  (revision, child)).fetchone()
+            if not row or row['source_input_hash'] != source_input_hash:
+                raise Conflict('evidence does not match the pinned shot source')
+            if row['decision'] is not None:
+                if (row['decision'], row['evidence_sha256']) != (decision, evidence_sha256):
+                    raise Conflict('candidate already resolved by another verdict')
+                return json.loads(row['result'])
+
+            event = json.loads(self.db.execute('SELECT payload FROM vf_events WHERE revision=?',
+                                               (revision,)).fetchone()['payload'])
+            result = dict(revision=revision, child=child, decision=decision, regenerate=[], state_repair=None)
+            if decision != 'distinct':
+                result['state_repair'] = dict(parent=event['target'], child=child, kind='state', keys=[event['key']])
+                assets = self._assets()
+                specs = {a['id']: json.loads(a['spec']) for a in assets}
+                if specs[child]['values'][event['key']] != event['value']:
+                    # Traverse the new edge from the edit anchor to this child.
+                    # Propagate from the child over the declared graph, leaving
+                    # already-valid work on the anchor untouched.
+                    delta = dict(event, target=child)
+                    edges = json.loads(project['edges'])
+                    plan = self._plan(assets, specs, edges, delta)
+                    changed = self._state_changes(assets, specs, edges, delta)
+                    self._invalidate(assets, specs, plan.regenerate, changed, delta)
+                    result['regenerate'] = list(plan.regenerate)
+            self.db.execute('UPDATE vf_evidence SET decision=?,evidence_sha256=?,result=? WHERE revision=? AND child=?',
+                            (decision, evidence_sha256, encode(result), revision, child))
             self._publish()
             return result
 
@@ -348,6 +444,10 @@ class AssetRuntime:
             return 'applied'
 
     def _publish(self):
+        revision = self._project()['revision']
+        if self.db.execute('SELECT 1 FROM vf_evidence WHERE revision=? AND decision IS NULL',
+                           (revision,)).fetchone():
+            return
         assets = self._assets()
         if any(a['output'] is None for a in assets):
             return
@@ -360,7 +460,7 @@ class AssetRuntime:
             if expected != a['committed_hash']:
                 raise Conflict('incompatible artifact provenance')
         entries = [dict(asset=a['id'], scene=a['scene'], kind=a['kind'], revision=a['revision'], input_hash=a['committed_hash'], output=a['output']) for a in assets]
-        self.db.execute('INSERT OR IGNORE INTO vf_timelines(revision,entries,published_at) VALUES (?,?,?)', (self._project()['revision'], encode(entries), time.time()))
+        self.db.execute('INSERT OR IGNORE INTO vf_timelines(revision,entries,published_at) VALUES (?,?,?)', (revision, encode(entries), time.time()))
 
     def snapshot(self):
         with self.transaction():

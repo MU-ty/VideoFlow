@@ -107,6 +107,74 @@ class StateRepairTests(unittest.TestCase):
                 dict(self.evidence('S2'), source_input_hash='b' * 64)
             ]))
 
+    def test_deferred_repair_blocks_publish_then_regenerates_only_the_delta(self):
+        source = {row['asset']: row for row in self.runtime.snapshot()['timeline']}
+        request = self.evidence('S2')
+        first = self.edit(evidence_candidates=['S2'])
+        self.assertEqual(self.runtime.edit(first)['regenerate'], ['S1'])
+        self.step()
+        self.step()
+        anchor = next(a for a in self.runtime.snapshot()['assets'] if a['id'] == 'S1')
+        self.assertIsNotNone(anchor['output'])
+        self.assertIsNone(self.runtime.snapshot()['timeline'])
+        self.runtime.close()
+        self.runtime = AssetRuntime(self.path)
+        with self.assertRaises(Conflict):
+            self.runtime.resolve_evidence(2, 'S2', 'b' * 64, 'a' * 64, 'match')
+        result = self.runtime.resolve_evidence(2, decision='match', **request)
+        self.assertEqual(result['regenerate'], ['S2', 'S4'])
+        self.assertEqual(self.runtime.resolve_evidence(2, decision='match', **request), result)
+        with self.assertRaises(Conflict):
+            self.runtime.resolve_evidence(2, decision='distinct', **request)
+        self.drain()
+        snap = self.runtime.snapshot()
+        self.assertEqual(next(a for a in snap['assets'] if a['id'] == 'S1'), anchor)
+        timeline = {row['asset']: row for row in snap['timeline']}
+        self.assertEqual(timeline['S3'], source['S3'])
+        self.assertEqual(timeline['S5'], source['S5'])
+        job = next(j for j in snap['jobs'] if j['asset'] == 'S4' and j['revision'] == 2)
+        self.assertEqual(json.loads(job['input_json'])['dependencies'][0]['input_hash'],
+                         timeline['S2']['input_hash'])
+
+    def test_new_revision_rejects_late_evidence_and_late_render(self):
+        request = self.evidence('S2')
+        self.runtime.edit(self.edit(evidence_candidates=['S2']))
+        self.runtime.resolve_evidence(2, decision='match', **request)
+        self.step(cap=1)
+        self.step(cap=1)
+        obsolete = next(job for job in self.runtime.active() if job['asset'] == 'S2')
+        self.runtime.close()
+        self.runtime = AssetRuntime(self.path)
+        self.runtime.edit(self.edit(id='red', expected_revision=2, value='red', evidence_candidates=['S2']))
+        with self.assertRaises(Conflict):
+            self.runtime.resolve_evidence(2, decision='match', **request)
+        result = self.runtime.resolve_evidence(3, decision='fallback', **request)
+        self.assertEqual(result['regenerate'], ['S2', 'S4'])
+        self.assertIn(dict(job=obsolete['id'], action='complete', result='stale'), self.step())
+        self.drain()
+        self.assertEqual([r[0] for r in self.runtime.db.execute(
+            'SELECT revision FROM vf_timelines ORDER BY revision')], [1, 3])
+        fresh = next(job for job in self.runtime.snapshot()['jobs'] if job['asset'] == 'S2' and job['revision'] == 3)
+        self.assertEqual(json.loads(fresh['input_json'])['spec']['values']['press.color'], 'red')
+
+    def test_unknown_does_not_release_barrier_and_new_negative_expires_prior_match(self):
+        initial = self.evidence('S2')
+        self.runtime.edit(self.edit(evidence_candidates=['S2']))
+        with self.assertRaises(Conflict):
+            self.runtime.edit(self.edit(id='unsafe', expected_revision=2, value='red'))
+        with self.assertRaises(ValueError):
+            self.runtime.resolve_evidence(2, decision='unknown', **initial)
+        self.runtime.resolve_evidence(2, decision='match', **initial)
+        self.drain()
+        before = {row['asset']: row for row in self.runtime.snapshot()['timeline']}
+        new = self.evidence('S2')
+        self.runtime.edit(self.edit(id='red', expected_revision=2, value='red', evidence_candidates=['S2']))
+        self.assertEqual(self.runtime.resolve_evidence(3, decision='distinct', **new)['regenerate'], [])
+        self.drain()
+        after = {row['asset']: row for row in self.runtime.snapshot()['timeline']}
+        self.assertEqual(after['S2'], before['S2'])
+        self.assertEqual(after['S4'], before['S4'])
+
 
 if __name__ == '__main__':
     unittest.main()
