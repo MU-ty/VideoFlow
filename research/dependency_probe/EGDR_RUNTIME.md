@@ -162,3 +162,19 @@ artifacts are unavailable. The per-arm repair trace, worker events, raw probe
 replies, archived videos, and report separate submission intents, completed
 provider work, byte reuse, and publication latency. Provider execution spans
 include host work. Visual edit correctness requires review of the rendered outputs.
+
+### H3 prompt diagnostic after the two-edit pilot
+
+Replay both target shots from the published EGDR ledger, with the original
+workflow and a variant that removes the adjective “amber” from the scene
+description alone. The red edit instruction is identical. Seeds and other
+render parameters are pinned to the ledger. The two shots use opposite
+condition orders. Inspect the target wheel over the full clip, including any
+late color transition, and check preservation of the press and scene.
+This paired diagnostic uses four H3 submissions and measures render quality
+with the chosen shots held fixed.
+
+```bash
+python3 -u research/dependency_probe/run_egdr_prompt_pair.py \
+  --source-run runs/egdr-online-01 --output runs/egdr-prompt-pair-01
+```
