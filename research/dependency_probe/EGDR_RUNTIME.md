@@ -48,3 +48,25 @@ Blind the method labels for post-edit assessment. Judge the intended change in e
 For E2, freeze story-level development, calibration, and test partitions before adjusting the verifier. Compare a single sample, four fixed samples, adaptive sampling at the same frame budget, and explicit multi-frame aggregation. Use the same source prompts and visibility criteria, and report error types separately for occlusion, brief visibility, and partial views. Account for frame count and model calls when comparing schedules. Keep the current stitch-selector example in development because it has already informed the design.
 
 For the final E1 and E3, evaluate 4–5 or more independently authored stories, with test stories unseen in tuning. Pair methods within a source revision. Record per-story counts and the cost of inference plus rendering, and use blind output assessment. The CPU replay is not a new selection benchmark. The main efficacy claim requires results from these unseen stories. The H3 pilot tests one edit, so a real in-flight edit and restart with a repaired edge remain a separate E4 check.
+
+## Versioned evidence replay
+
+Run this separate CPU experiment from the repository root.
+
+```bash
+mkdir -p runs
+python3 research/dependency_probe/replay_versioned_egdr.py > runs/egdr-versioned-replay-v1.json
+python3 -m unittest discover -s tests -p test_egdr_versioned_replay.py -v
+```
+
+The three traces use the archived Blender press control for source clip identities. They add a synthetic S5 reference consumer of S2. Evidence verdicts and arrival times are scripted. The trace uses a single authored edit target and attribute, an explicit candidate set, fixed service times, and two non-preemptive slots. The publication barrier waits for all current candidate verdicts and the planned inputs to be committed. An unknown verdict leaves the barrier in place. Each current candidate accepts at most one definitive verdict. Late responses for another edit or source digest are rejected. The replay does not call a VLM, generate videos, or exercise the production SQLite worker.
+
+All policies share the same evidence and publication barrier. The waiting Worklist starts submitting only after the barrier has enough evidence. The online Worklist replans using the complete current accepted edge set and reuses matching input fingerprints. EGDR starts with the declared closure and expands from each newly confirmed consumer. Both online policies retain input-compatible work. The JSON includes each evidence decision, submission, completion and publication. Gold sets are used only for scoring the final published selection.
+
+| Trace | Wait Worklist | Online Worklist | EGDR delta |
+| --- | ---: | ---: | ---: |
+| Late confirmation | 13 / 3 | 9 / 3 | 9 / 3 |
+| Lookalike counterevidence | 14 / 3 | 8 / 3 | 8 / 3 |
+| Superseded evidence | 11 / 3 | 10 / 4 | 10 / 4 |
+
+Cells give simulated ticks from the last edit to publication / submission intents after the initial fixture. All nine policy runs publish the expected final shot set. In the superseded trace, both online policies spend one extra intent on an obsolete render. The online policies have identical event logs apart from their policy names. These cases demonstrate the trade-off of overlapping evidence acquisition with rendering. A comparative EGDR benefit would require evidence that improves the selection or arrives with lower verification cost on independent stories, or a broader execution experiment with a measured difference under the same evidence.

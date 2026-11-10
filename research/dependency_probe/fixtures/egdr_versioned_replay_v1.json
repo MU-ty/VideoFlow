@@ -1,0 +1,44 @@
+{
+  "source": "egdr-press-control-v1.zip",
+  "source_shots": ["S1", "S2", "S3", "S4"],
+  "scope": {"target": "S1", "entity": "press with two teal stripes", "part": "ribbed handwheel", "key": "press.handwheel_color"},
+  "shots": ["S1", "S2", "S3", "S4", "S5"],
+  "edges": [{"parent": "S2", "child": "S5", "kind": "reference"}],
+  "source_note": "S1–S4 use the frozen Blender control clips. S5 is an added synthetic reference consumer.",
+  "render_ticks": {"S1": 8, "S2": 2, "S3": 2, "S4": 2, "S5": 2},
+  "capacity": 2,
+  "horizon": 24,
+  "traces": [
+    {
+      "id": "late-match",
+      "edits": [{"tick": 0, "revision": 2, "value": "blue", "candidates": ["S2"]}],
+      "evidence": [
+        {"tick": 5, "revision": 2, "shot": "S2", "source_shot": "S2", "decision": "match"}
+      ],
+      "gold": ["S1", "S2", "S5"]
+    },
+    {
+      "id": "lookalike-counterevidence",
+      "edits": [{"tick": 0, "revision": 2, "value": "blue", "candidates": ["S2", "S3"]}],
+      "evidence": [
+        {"tick": 1, "revision": 2, "shot": "S2", "source_shot": "S2", "decision": "match"},
+        {"tick": 2, "revision": 2, "shot": "S3", "source_shot": "S3", "decision": "unknown"},
+        {"tick": 6, "revision": 2, "shot": "S3", "source_shot": "S3", "decision": "distinct"}
+      ],
+      "gold": ["S1", "S2", "S5"]
+    },
+    {
+      "id": "superseded-evidence",
+      "edits": [
+        {"tick": 0, "revision": 2, "value": "blue", "candidates": ["S2"]},
+        {"tick": 2, "revision": 3, "value": "red", "candidates": ["S2"]}
+      ],
+      "evidence": [
+        {"tick": 3, "revision": 3, "shot": "S2", "source_shot": "S3", "decision": "match"},
+        {"tick": 4, "revision": 2, "shot": "S2", "source_shot": "S2", "decision": "match"},
+        {"tick": 5, "revision": 3, "shot": "S2", "source_shot": "S2", "decision": "match"}
+      ],
+      "gold": ["S1", "S2", "S5"]
+    }
+  ]
+}
