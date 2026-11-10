@@ -119,7 +119,38 @@ def radio_inputs(seed):
     ), question
 
 
-STORIES = {'striped-press': pilot_inputs, 'hexagon-lamp': lamp_inputs, radio.STORY: radio_inputs}
+def lunchbox_inputs(seed):
+    target = 'a deep-purple hard-shell lunchbox with one large white five-point star on its front'
+    part = 'a thick yellow carry handle attached to the top'
+    shots = {
+        'S1': f'Locked frontal product shot of {target} with {part}. '
+              'Show the entire handle and front decal against a seamless light gray backdrop.',
+        'S2': 'Locked frontal product shot of a deep-purple hard-shell lunchbox with one large '
+              f'white triangle on its front and {part}. Show the entire handle and front decal '
+              'against a seamless light gray backdrop.',
+        'S3': f'Locked three-quarter product shot of {target} with {part}. '
+              'Show the entire handle and front decal against a seamless light gray backdrop.',
+        'S4': 'Locked product shot of a single empty white ceramic bowl centered on a seamless '
+              'pale gray studio sweep. The smooth backdrop and tabletop fill the entire frame.',
+    }
+    edit = (
+        f'Recolor only the thick yellow carry handle of {target} to cobalt blue wherever visible. '
+        'Preserve the purple shell and white star. Keep the triangle-marked lunchbox, bowl '
+        'and other contents unchanged. Do not add a lunchbox or handle where absent.'
+    )
+    question = (
+        'In any single source panel, is there a thick yellow carry handle visibly attached '
+        'to a deep-purple lunchbox whose own front face has a large white five-point star? '
+        'A white triangle or a mark on another object does not count.'
+    )
+    return color_manifest(shots, seed), dict(
+        id=radio.LUNCHBOX_STORY, entity=f'carry handle of {target}', attribute='color',
+        edit=edit, shots=shots, declared=['S1'],
+    ), question
+
+
+STORIES = {'striped-press': pilot_inputs, 'hexagon-lamp': lamp_inputs,
+           radio.STORY: radio_inputs, radio.LUNCHBOX_STORY: lunchbox_inputs}
 LAMP_ORACLE = {
     'source': {
         'S1': 'Silver dome shade and black hexagon visibly belong to the same lamp',
@@ -195,8 +226,9 @@ def prepare_conditioned_builder(root, source, backend, regions, story):
     references = {}
     lamp = story == 'hexagon-lamp'
     region_name = 'shade_outline' if lamp else 'handle_outline'
+    reference_name = {radio.STORY: 'radio', radio.LUNCHBOX_STORY: 'lunchbox'}.get(story, 'lamp')
     for shot, (digest, outline) in regions.items():
-        path = root / f'{shot}-{"lamp" if lamp else "radio"}-reference.png'
+        path = root / f'{shot}-{reference_name}-reference.png'
         references[shot] = make_conditioned_reference(
             root / 'source' / source[shot]['file'], path, shot, digest, outline, region_name)
     for shot, entry in references.items():
@@ -217,9 +249,11 @@ def prepare_conditioned_builder(root, source, backend, regions, story):
                      + ' Keep the shade scarlet red from the first visible frame through the end. '
                        'Preserve the cream base, black hexagon, desk, and background.')
         else:
+            preserved = ('the purple shell, white star and background'
+                         if story == radio.LUNCHBOX_STORY else 'the mint-green body, white X, and background')
             scene = (scene.replace('thick yellow carry handle', 'thick scarlet red carry handle')
                      + ' Keep the carry handle scarlet red from the first visible frame through the end. '
-                       'Preserve the mint-green body, white X, and background.')
+                     + f'Preserve {preserved}.')
         graph['5']['inputs']['prompt'] = scene
         return condition(graph, entry['provider_image'])
     return build
@@ -317,11 +351,11 @@ def run(args):
         # Keep the predeclared evaluation labels out of all model inputs.
         write_json(args.output / 'visual_oracle.json', LAMP_ORACLE)
     protocol_fields = ({
-        'holdout_protocol_sha256': checksum(radio.PROTOCOL),
+        'holdout_protocol_sha256': checksum(radio.HOLDOUTS[args.story][1]),
         'reference_regions_sha256': checksum(args.reference_regions) if args.reference_regions else None,
         'oracle_labels_sha256': checksum(args.oracle_labels) if args.oracle_labels else None,
     }
-                       if args.story == radio.STORY else {})
+                       if args.story in radio.HOLDOUTS else {})
     write_json(args.output / 'protocol.json', dict(story=args.story, seed=args.seed, manifest=manifest, case=case,
                question=question, policies=args.policies, text_model=args.text_model,
                vision_model=args.vision_model, frame_notes=bool(args.frame_notes), timeout=args.timeout,
@@ -346,7 +380,7 @@ def run(args):
             raise ValueError('source run must have published revision 1')
         before = archive_current(original, args.output / 'source', backend.base, probe=True)
         if args.source_run:
-            if args.story == radio.STORY:
+            if args.story in radio.HOLDOUTS:
                 radio.check_protocol(args.source_run)
             frozen = json.loads((args.source_run / 'source' / 'revision-1.json').read_text())
             if (before['timeline_hash'] != frozen['timeline_hash']
@@ -539,7 +573,7 @@ def main():
     parser.add_argument('--lamp-reference-frames', action='store_true',
                         help='use the verified seed-88101 shade contours for final target renders')
     parser.add_argument('--reference-regions', type=Path,
-                        help='verified radio source digests and first-frame handle contours')
+                        help='verified holdout source digests and first-frame handle contours')
     parser.add_argument('--frame-notes', type=Path,
                         help='optional independent observations from this seed, keyed by shot')
     source = parser.add_mutually_exclusive_group()
@@ -554,16 +588,17 @@ def main():
     if args.lamp_reference_frames and not (args.story == 'hexagon-lamp' and args.seed == 88101
                                             and args.source_run and args.continuous):
         parser.error('--lamp-reference-frames requires --story hexagon-lamp --seed 88101 --source-run and --continuous')
-    if args.story == radio.STORY:
-        if (args.seed, args.timeout, args.poll) != (radio.SEED, 1800, 3) or args.frame_notes:
-            parser.error('the radio holdout requires the frozen seed, timeout, poll and no frame notes')
+    if args.story in radio.HOLDOUTS:
+        seed, _ = radio.HOLDOUTS[args.story]
+        if (args.seed, args.timeout, args.poll) != (seed, 1800, 3) or args.frame_notes:
+            parser.error('the holdout requires its frozen seed, timeout, poll and no frame notes')
         if not args.source_only and not (args.source_run and args.continuous and args.oracle_labels
                                          and args.reference_regions
                                          and tuple(args.policies) == radio.POLICIES
                                          and args.vision_model == 'qwen2.5vl:7b-ctx8k'):
-            parser.error('the radio holdout requires the frozen four-arm conditioned protocol')
+            parser.error('the holdout requires the frozen four-arm conditioned protocol')
     elif args.reference_regions:
-        parser.error('--reference-regions is only supported by the radio holdout')
+        parser.error('--reference-regions is only supported by the conditioned holdouts')
     continuous_policies = {'worklist', 'full'} | DEFERRED_POLICIES
     if args.continuous and not set(args.policies) <= continuous_policies:
         parser.error('--continuous supports worklist, online_egdr, oracle_egdr, and full')
