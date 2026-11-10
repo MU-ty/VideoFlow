@@ -7,10 +7,54 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'research/dependency_probe'))
-from vision_probe import parse_visual, run_case, visual_reply
+from vision_probe import CONFLICT_METHOD, parse_conflict_review, parse_visual, run_case, visual_reply
 
 
 class VisionProbeTest(unittest.TestCase):
+    def test_conflict_review_removes_only_soft_seeds_with_confirmed_distinct_identity(self):
+        shots = ('anchor', 'match', 'decoy', 'unknown', 'unclear', 'malformed', 'hard', 'decoy_child')
+        case = dict(id='edit', story='story', entity='dial', attribute='color',
+                    edit='Recolor the dial', shots=dict.fromkeys(shots, 'workshop'),
+                    declared=['anchor'], gold=['anchor', 'match', 'unknown', 'unclear', 'malformed', 'hard'],
+                    edges=[dict(parent='match', child='hard', kind='reference'),
+                           dict(parent='decoy', child='decoy_child', kind='reference')])
+        sheets = {shot: Path(f'{shot}.jpg') for shot in shots}
+        positive = '{"decision":"yes","panel":1,"evidence":"marked housing"}'
+        negative = '{"decision":"no","panel":null,"evidence":"another housing"}'
+        unknown = '{"decision":"unknown","panel":null,"evidence":""}'
+        confirmed = '{"identity":"yes","part":"yes","position":"yes","panel":1,"evidence":"marked dial"}'
+        distinct = ('{"decision":"distinct","panel":2,"identity_marker":"orange diamond",'
+                    '"evidence":"The dial is mounted next to the diamond on the same housing."}')
+        review_unknown = '{"decision":"unknown","panel":null,"identity_marker":"","evidence":""}'
+        visual_by_shot = {'match': positive, 'unknown': unknown}
+        raw_by_shot = {'match': confirmed, 'unclear': review_unknown, 'malformed': 'not JSON'}
+        logs = []
+        with patch('vision_probe.predict', side_effect=[
+                (['decoy', 'unknown', 'unclear', 'malformed', 'hard'], 'text'), ([], 'observed')]), \
+             patch('vision_probe.visual_reply',
+                   side_effect=lambda _, __, ___, sheet, **kw: visual_by_shot.get(sheet.stem, negative)), \
+             patch('vision_probe.image_reply',
+                   side_effect=lambda _, __, sheet, *args: raw_by_shot.get(sheet.stem, distinct)):
+            report = run_case(case, sheets, 'server', 'text-model', 'vision-model', logs.append,
+                              visibility_question='Is the striped press dial visible?',
+                              verify_visual=True, review_conflicts=True)
+        methods = {row['method']: row for row in report['results']}
+        self.assertEqual(methods['union_plus_verified']['selected'], sorted(shots))
+        self.assertEqual(methods[CONFLICT_METHOD]['selected'], sorted(case['gold']))
+        self.assertEqual(report['conflict_calls'], 4)
+        self.assertEqual(report['conflict_vetoed_seeds'], ['decoy', 'hard'])
+        self.assertEqual(report['conflict_removed'], ['decoy', 'decoy_child'])
+        self.assertEqual(report['conflict_invalid'], ['malformed'])
+        self.assertEqual([item['shot'] for item in logs if item['method'] == 'vision_conflict_review'],
+                         ['decoy', 'hard', 'malformed', 'unclear'])
+
+    def test_distinct_requires_visible_marker_and_localized_evidence(self):
+        review = dict(decision='distinct', panel=1, identity_marker='orange diamond', evidence='on housing')
+        self.assertEqual(parse_conflict_review(json.dumps(review)), review)
+        for overrides in ({'panel': None}, {'panel': True}, {'identity_marker': ' '}, {'evidence': ''}):
+            with self.subTest(overrides=overrides), self.assertRaises(ValueError):
+                parse_conflict_review(json.dumps(review | overrides))
+
     def test_visual_verification_requires_all_checks_and_preserves_raw_baseline(self):
         case = dict(id='edit', story='story', entity='dial', attribute='color',
                     edit='Recolor the dial', shots={'S1': 'dial', 'S2': 'handwheel'},

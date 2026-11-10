@@ -63,6 +63,30 @@ VERIFY_SCHEMA = {
         'evidence': {'type': 'string'},
     },
 }
+CONFLICT_METHOD = 'union_plus_conflict_review'
+CONFLICT_INSTRUCTIONS = (
+    'Independently inspect the four original panels to resolve the identity of the target '
+    'in the question below. Return distinct only when one panel visibly links the '
+    'lookalike part to a different object instance using a concrete conflicting marker '
+    '(for example, an explicitly excluded emblem on its housing), and no panel shows '
+    'the target. Absence, cropping, occlusion, or a missing marker alone is insufficient. '
+    'If both instances are visible and the target part is visible, return match. '
+    'If the association is ambiguous, return unknown. '
+    'Number panels 1 top left, 2 top right, 3 bottom left, 4 bottom right. '
+    'For distinct, cite one panel, name the visible conflicting marker, and explain '
+    'how that panel links it to the lookalike part. Use null panel for unknown.\n'
+)
+CONFLICT_SCHEMA = {
+    'type': 'object',
+    'required': ['decision', 'panel', 'identity_marker', 'evidence'],
+    'additionalProperties': False,
+    'properties': {
+        'decision': {'enum': ['distinct', 'match', 'unknown']},
+        'panel': {'enum': [None, 1, 2, 3, 4]},
+        'identity_marker': {'type': 'string'},
+        'evidence': {'type': 'string'},
+    },
+}
 
 
 def load_cases(path):
@@ -182,11 +206,33 @@ def parse_verification(raw):
     return matched
 
 
+def parse_conflict_review(raw):
+    answer = json.loads(raw)
+    if (not isinstance(answer, dict)
+            or set(answer) != set(CONFLICT_SCHEMA['required'])
+            or answer['decision'] not in ('distinct', 'match', 'unknown')
+            or not all(isinstance(answer[key], str) for key in ('identity_marker', 'evidence'))):
+        raise ValueError('invalid conflict review')
+    panel = answer['panel']
+    if panel is not None and (type(panel) is not int or not 1 <= panel <= len(FRACTIONS)):
+        raise ValueError('invalid conflict review panel')
+    if (answer['decision'] == 'distinct'
+            and (panel is None or not answer['identity_marker'].strip()
+                 or not answer['evidence'].strip())):
+        raise ValueError('distinct identity requires a panel, visible marker and evidence')
+    if answer['decision'] == 'unknown' and panel is not None:
+        raise ValueError('unknown identity requires a null panel')
+    return answer
+
+
 def collect_selections(case, sheets, server, text_model, vision_model, log, *,
-                       visibility_question=None, verify_visual=False):
+                       visibility_question=None, verify_visual=False, review_conflicts=False):
+    if review_conflicts and (not verify_visual or not visibility_question):
+        raise ValueError('conflict review requires visual verification and a source question')
     public = planning_input(case)
     declared = close_selection(public, set())
     methods = {'attr_dag': declared, 'full': set(case['shots'])}
+    checklist_seeds = set()
     for observed in (False, True):
         method = 'checklist_observed' if observed else 'checklist_text'
         shots = {shot: ' '.join(shot_sources(desc, observed).values())
@@ -196,11 +242,12 @@ def collect_selections(case, sheets, server, text_model, vision_model, log, *,
         log(dict(case=case['id'], method=method, raw=raw))
         if proposed is None:
             raise ValueError(f"{case['id']}: invalid {method} reply")
+        checklist_seeds.update(proposed)
         methods[method] = close_selection(public, set(proposed))
     union = methods['checklist_text'] | methods['checklist_observed']
     methods['checklist_union'] = close_selection(public, union)
 
-    positives = set()
+    positives, negatives = set(), set()
     unknown, retries, invalid = [], [], []
     for shot in sorted(set(case['shots']) - declared):
         raw = visual_reply(server, vision_model, case['edit'], sheets[shot],
@@ -220,6 +267,8 @@ def collect_selections(case, sheets, server, text_model, vision_model, log, *,
                 continue
         if reply['decision'] == 'yes':
             positives.add(shot)
+        elif reply['decision'] == 'no':
+            negatives.add(shot)
         elif reply['decision'] == 'unknown':
             unknown.append(shot)
     verified, verification_invalid, verification_unknown = set(), [], []
@@ -245,19 +294,44 @@ def collect_selections(case, sheets, server, text_model, vision_model, log, *,
         if verify_visual and not verification_invalid:
             methods['vision_verified'] = close_selection(public, verified)
             methods['union_plus_verified'] = close_selection(public, union | verified)
+    conflict_audit = {}
+    if review_conflicts:
+        reviews, malformed, vetoes = {}, [], set()
+        if 'union_plus_verified' in methods:
+            for shot in sorted((checklist_seeds & negatives) - declared):
+                raw = image_reply(server, vision_model, sheets[shot],
+                                  CONFLICT_INSTRUCTIONS + visibility_question, CONFLICT_SCHEMA)
+                log(dict(case=case['id'], method='vision_conflict_review', shot=shot, raw=raw))
+                try:
+                    reviews[shot] = parse_conflict_review(raw)
+                except ValueError:
+                    malformed.append(shot)
+                    continue
+                if reviews[shot]['decision'] == 'distinct':
+                    vetoes.add(shot)
+            # Remove soft seeds before closing the graph. A vetoed shot may
+            # still be required by a hard edge from a retained seed.
+            methods[CONFLICT_METHOD] = close_selection(public, (checklist_seeds - vetoes) | verified)
+        conflict_audit = dict(
+            conflict_reviews=reviews, conflict_invalid=malformed,
+            conflict_calls=len(reviews) + len(malformed), conflict_vetoed_seeds=sorted(vetoes),
+            conflict_removed=sorted(methods.get('union_plus_verified', set())
+                                    - methods.get(CONFLICT_METHOD, set())),
+        )
     return methods, dict(visual_positives=sorted(positives), visual_unknown=unknown,
                          visual_retries=retries, visual_invalid=invalid,
                          vision_calls=len(case['shots']) - len(declared) + len(retries),
                          verified_positives=sorted(verified), verification_invalid=verification_invalid,
                          verification_unknown=verification_unknown,
-                         verification_calls=len(positives) if verify_visual else 0)
+                         verification_calls=len(positives) if verify_visual else 0,
+                         **conflict_audit)
 
 
 def run_case(case, sheets, server, text_model, vision_model, log, *,
-             visibility_question=None, verify_visual=False):
+             visibility_question=None, verify_visual=False, review_conflicts=False):
     methods, audit = collect_selections(case, sheets, server, text_model, vision_model, log,
                                         visibility_question=visibility_question,
-                                        verify_visual=verify_visual)
+                                        verify_visual=verify_visual, review_conflicts=review_conflicts)
     gold, costs = set(case['gold']), case.get('costs', {})
     results = [dict(method=method, selected=sorted(selected), missed=sorted(gold - selected),
                     excess=sorted(selected - gold), cost=sum(costs.get(s, 1) for s in selected))
@@ -277,9 +351,13 @@ def main():
                         help='JSON mapping each case ID to a source-only visual question')
     parser.add_argument('--verify-visual', action='store_true',
                         help='check identity, part, and position for each visual positive')
+    parser.add_argument('--review-conflicts', action='store_true',
+                        help='audit Checklist seeds explicitly rejected by the visual pass')
     args = parser.parse_args()
     if args.verify_visual and args.visibility_questions is None:
         parser.error('--verify-visual requires --visibility-questions')
+    if args.review_conflicts and not args.verify_visual:
+        parser.error('--review-conflicts requires --verify-visual')
     cases = load_cases(args.cases)
     questions = {}
     if args.visibility_questions is not None:
@@ -305,6 +383,8 @@ def main():
                     visual_format_retry_limit=1,
                     visual_verification_instructions=VERIFY_INSTRUCTIONS if args.verify_visual else None,
                     prepare_only=args.prepare_only)
+    if args.review_conflicts:
+        protocol['conflict_review_instructions'] = CONFLICT_INSTRUCTIONS
     (args.output / 'protocol.json').write_text(json.dumps(protocol, indent=2) + '\n', encoding='utf-8')
     if args.prepare_only:
         return
@@ -318,7 +398,7 @@ def main():
             print(f"{case['story']}/{case['id']}", flush=True)
             rows.append(run_case(case, sheets[case['story']], args.server, args.text_model,
                                  args.vision_model, log, visibility_question=questions.get(case['id']),
-                                 verify_visual=args.verify_visual))
+                                 verify_visual=args.verify_visual, review_conflicts=args.review_conflicts))
     invalid = {row['case']: row['visual_invalid'] for row in rows if row['visual_invalid']}
     verification_invalid = {row['case']: row['verification_invalid'] for row in rows
                             if row['verification_invalid']}
@@ -328,8 +408,8 @@ def main():
     totals = summarize(rows)
     by_story = {story: summarize([row for row in rows if row['story'] == story]) for story in sheets}
     union = totals['checklist_union']
-    blocked = visual_methods if invalid else (
-        ('vision_verified', 'union_plus_verified') if verification_invalid else ()
+    blocked = visual_methods + [CONFLICT_METHOD] if invalid else (
+        ('vision_verified', 'union_plus_verified', CONFLICT_METHOD) if verification_invalid else ()
     )
     for counts in (totals, *by_story.values()):
         for method in blocked:
@@ -343,9 +423,25 @@ def main():
                   versus_union=deltas, visual_evaluation_complete=not invalid, visual_invalid=invalid,
                   verification_evaluation_complete=(not invalid and not verification_invalid)
                   if args.verify_visual else None, verification_invalid=verification_invalid)
+    if args.review_conflicts:
+        conflict_invalid = {row['case']: row['conflict_invalid'] for row in rows if row['conflict_invalid']}
+        old, new = totals.get('union_plus_verified'), totals.get(CONFLICT_METHOD)
+        report.update(
+            conflict_evaluation_complete=not (invalid or verification_invalid or conflict_invalid),
+            conflict_invalid=conflict_invalid,
+            conflict_model_calls=sum(row['conflict_calls'] for row in rows),
+            conflict_vs_verified_union={metric: new[metric] - old[metric]
+                                        for metric in ('missed', 'excess', 'cost', 'exact_cases')}
+            if old is not None and new is not None else None,
+        )
     (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-    print(json.dumps(dict(totals=totals, versus_union=deltas, visual_invalid=invalid,
-                          verification_invalid=verification_invalid), indent=2))
+    summary = dict(totals=totals, versus_union=deltas, visual_invalid=invalid,
+                   verification_invalid=verification_invalid)
+    if args.review_conflicts:
+        summary.update({key: report[key] for key in (
+            'conflict_model_calls', 'conflict_invalid', 'conflict_vs_verified_union',
+        )})
+    print(json.dumps(summary, indent=2))
 
 
 if __name__ == '__main__':
