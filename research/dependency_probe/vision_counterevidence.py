@@ -48,6 +48,74 @@ STATION_QUESTION = (
 )
 FIXTURE = Path(__file__).with_name('fixtures') / 'egdr_evidence_resampling_v1.zip'
 
+OBSERVATION_PROMPT = (
+    'Record visual facts for each of the {panels} source panels. '
+    'Number panels from 1 in reading order. Inspect the {housing}. '
+    'Read the shape of the actual marker on the housing and check visibility of the {part}. '
+    'Report same_housing as yes only if you can see both the marker and that part on the '
+    'same physical object in this panel. Do not carry evidence between panels. Use '
+    'unknown for an obscured or unclear marker or attachment. Use multiple for the '
+    'marker shape when more than one candidate housing is visible in a panel. '
+    'Return one observation per panel.\n'
+)
+OBSERVATION_RULES = {
+    'lamp_regression': dict(housing='cream desk lamp base', part='silver dome shade',
+                            target_shape='hexagon', conflicting_shape='triangle'),
+    'station_transfer': dict(housing='navy station intercom faceplate', part='round red pushbutton',
+                             target_shape='triangle', conflicting_shape='plus'),
+}
+OBSERVATION_VALUES = {
+    'marker_shape': ['unknown', 'triangle', 'hexagon', 'plus', 'other', 'multiple'],
+    'part_visibility': ['unknown', 'visible', 'not_visible'],
+    'same_housing': ['unknown', 'yes', 'no'],
+}
+
+
+def observation_schema(panel_count):
+    return {
+        'type': 'array', 'minItems': panel_count, 'maxItems': panel_count,
+        'items': {
+            'type': 'object', 'required': ['panel', *OBSERVATION_VALUES],
+            'additionalProperties': False,
+            'properties': {
+                'panel': {'enum': list(range(1, panel_count + 1))},
+                **{key: {'enum': values} for key, values in OBSERVATION_VALUES.items()},
+            },
+        },
+    }
+
+
+def parse_observations(raw, panel_count):
+    panels = json.loads(raw)
+    fields = {'panel', *OBSERVATION_VALUES}
+    if not isinstance(panels, list) or len(panels) != panel_count:
+        raise ValueError('expected exactly one observation per source panel')
+    for row in panels:
+        if (not isinstance(row, dict) or set(row) != fields or type(row['panel']) is not int
+                or any(row[key] not in values for key, values in OBSERVATION_VALUES.items())):
+            raise ValueError('invalid visual observation')
+    if {row['panel'] for row in panels} != set(range(1, panel_count + 1)):
+        raise ValueError('duplicate or nonexistent source panel')
+    return panels
+
+
+def decide_observations(panels, rules):
+    """Resolve edit-relative roles in code using the declared shape rules."""
+    support = {'target': [], 'conflict': [], 'uncertain': []}
+    for row in panels:
+        bound = row['part_visibility'] == 'visible' and row['same_housing'] == 'yes'
+        if bound and row['marker_shape'] == rules['target_shape']:
+            support['target'].append(row['panel'])
+        elif bound and row['marker_shape'] == rules['conflicting_shape']:
+            support['conflict'].append(row['panel'])
+        else:
+            support['uncertain'].append(row['panel'])
+    if support['target']:
+        return 'match', 'target_part_bound_in_sample', support
+    if support['conflict'] and not support['uncertain']:
+        return 'distinct', 'conflicting_marker_and_part_bound_in_every_sample', support
+    return 'unknown', 'insufficient_or_ambiguous_evidence', support
+
 
 def counterevidence_verdict(raw, panel_count):
     row = json.loads(raw)
@@ -133,10 +201,10 @@ def prepare_cases(lamp, output):
     return cases
 
 
-def summarize(rows):
+def summarize(rows, variant='counterevidence'):
     report = {}
     for group in ('lamp_regression', 'station_transfer'):
-        for method in ('baseline', 'counterevidence'):
+        for method in ('baseline', variant):
             subset = [row for row in rows if row['group'] == group and row['method'] == method]
             report.setdefault(group, {})[method] = dict(
                 cases=len(subset),
@@ -159,19 +227,23 @@ def summarize(rows):
 def evaluate(cases, args, log):
     rows = []
     for index, case in enumerate(cases):
-        methods = ('baseline', 'counterevidence')
+        methods = ('baseline', args.variant)
         if index % 2:
             methods = methods[::-1]
         for method in methods:
             if method == 'baseline':
                 instruction = SINGLE_BASELINE if case['panels'] == 1 else VERIFY_INSTRUCTIONS
-                schema = VERIFY_SCHEMA
+                prompt, schema = instruction + case['question'], VERIFY_SCHEMA
+            elif method == 'observations':
+                rules = OBSERVATION_RULES[case['group']]
+                prompt = OBSERVATION_PROMPT.format(panels=case['panels'], **rules)
+                schema = observation_schema(case['panels'])
             else:
-                instruction, schema = INSTRUCTIONS, SCHEMA
+                prompt, schema = INSTRUCTIONS + case['question'], SCHEMA
             print(f'{case["id"]} {method}', flush=True)
             start = monotonic()
             raw = image_reply(args.server, args.model, args.output / case['image'],
-                              instruction + case['question'], schema)
+                              prompt, schema)
             row = {key: case[key] for key in ('id', 'group', 'gold', 'image_sha256')}
             row.update(method=method, raw=raw, seconds=monotonic() - start)
             try:
@@ -180,8 +252,13 @@ def evaluate(cases, args, log):
                     if matched and json.loads(raw)['panel'] > case['panels']:
                         raise ValueError('baseline cites a nonexistent panel')
                     row['decision'] = 'match' if matched else 'unknown'
-                else:
+                elif method == 'counterevidence':
                     row['decision'] = counterevidence_verdict(raw, case['panels'])
+                else:
+                    observations = parse_observations(raw, case['panels'])
+                    decision, reason, support = decide_observations(observations, rules)
+                    row.update(decision=decision, observations=observations,
+                               decision_reason=reason, support_panels=support)
             except ValueError as error:
                 row.update(decision='unknown', error=str(error))
             log.write(json.dumps(row) + '\n')
@@ -196,6 +273,8 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--server', default='http://127.0.0.1:11434')
     parser.add_argument('--model', default='qwen2.5vl:7b-ctx8k')
+    parser.add_argument('--variant', choices=('counterevidence', 'observations'),
+                        default='counterevidence')
     parser.add_argument('--prepare-only', action='store_true')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
@@ -206,13 +285,21 @@ def main():
                     prompts=dict(single_baseline=SINGLE_BASELINE, baseline=VERIFY_INSTRUCTIONS,
                                  counterevidence=INSTRUCTIONS),
                     schemas=dict(baseline=VERIFY_SCHEMA, counterevidence=SCHEMA))
+    if args.variant == 'observations':
+        protocol.update(
+            variant=args.variant, observation_rules=OBSERVATION_RULES,
+            observation_prompt=OBSERVATION_PROMPT,
+            observation_schemas={count: observation_schema(count) for count in (1, 4)},
+            observation_policy='match on any bound target; distinct only if every sampled '
+                               'panel binds a conflicting shape and visible part; otherwise retain',
+        )
     (args.output / 'protocol.json').write_text(json.dumps(protocol, indent=2) + '\n')
     if args.prepare_only:
         print(f'Prepared {len(cases)} cases')
         return
     with (args.output / 'responses.jsonl').open('w') as log:
         rows = evaluate(cases, args, log)
-    report = dict(model_calls=len(rows), metrics=summarize(rows))
+    report = dict(model_calls=len(rows), metrics=summarize(rows, args.variant))
     result = json.dumps(report, indent=2)
     (args.output / 'report.json').write_text(result + '\n')
     print(result)
