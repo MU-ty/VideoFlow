@@ -47,17 +47,64 @@ def pilot_inputs(seed):
             'objects unchanged. Do not add an absent press or handwheel.')
     case = dict(id='striped-press', entity=ENTITY, attribute='color', edit=edit,
                 shots=shots, declared=['S1'])
-    # All arms share the same base prompt, including the input slot; only its
-    # value changes where the edit is applied.
-    manifest = dict(assets=[
+    question = ('Do any of the four original panels show a ribbed amber handwheel '
+                'belonging to the cream press with two teal stripes? The orange-diamond '
+                'press does not count.')
+    return color_manifest(shots, seed), case, question
+
+
+def color_manifest(shots, seed):
+    # All arms share the same editable prompt bindings and initial values.
+    return dict(assets=[
         asset(shot, prompt + ' Apply the following appearance instruction where it applies. {{target.color}}',
               {KEY: 'Preserve the described original appearance.'}, seed + index)
         for index, (shot, prompt) in enumerate(shots.items())
     ])
-    question = ('Do any of the four original panels show a ribbed amber handwheel '
-                'belonging to the cream press with two teal stripes? The orange-diamond '
-                'press does not count.')
-    return manifest, case, question
+
+
+def lamp_inputs(seed):
+    target = 'the cream desk lamp with one large black hexagon on its cream base'
+    shots = {
+        'S1': f'Steady frontal close-up of {target} and its solid silver metal dome shade. '
+              'Both the shade and the black hexagon are fully visible on a wooden desk.',
+        'S2': 'Steady close-up of a different cream desk lamp with one large orange triangle '
+              'on its cream base and a solid silver metal dome shade. Both are visible.',
+        'S3': f'Steady three-quarter view of {target} and its solid silver metal dome shade. '
+              'Both the shade and the black hexagon remain visible on a wooden desk.',
+        'S4': 'Steady close-up of a closed black tool case alone on a shelf. No lamp is visible.',
+    }
+    edit = (
+        f'Recolor only the silver metal dome shade of {target} to cobalt blue wherever visible. '
+        'Preserve the cream base and black hexagon. Keep the orange-triangle lamp and all other '
+        'objects unchanged. Do not add a lamp where none is visible.'
+    )
+    case = dict(id='hexagon-lamp', entity=f'silver metal dome shade of {target}',
+                attribute='color', edit=edit, shots=shots, declared=['S1'])
+    question = (
+        'In any single source panel, do you see a solid silver metal dome shade on a cream '
+        'desk lamp whose own cream base has a large black hexagon? The orange-triangle lamp '
+        'and a shelf without a lamp do not count.'
+    )
+    return color_manifest(shots, seed), case, question
+
+
+STORIES = {'striped-press': pilot_inputs, 'hexagon-lamp': lamp_inputs}
+LAMP_ORACLE = {
+    'source': {
+        'S1': 'Silver dome shade and black hexagon visibly belong to the same lamp',
+        'S2': 'Different silver-shaded lamp marked by an orange triangle',
+        'S3': 'Silver dome shade and black hexagon visibly belong to the same lamp',
+        'S4': 'Closed black tool case with no lamp',
+    },
+    'final': {
+        'S1': 'Scarlet dome shade, cream base and black hexagon retained',
+        'S2': 'Silver shade and orange triangle retained',
+        'S3': 'Scarlet dome shade, cream base and black hexagon retained',
+        'S4': 'Closed tool case retained, no lamp added',
+    },
+    'target_shots': ['S1', 'S3'],
+    'declared_shots': ['S1'],
+}
 
 
 def apply_policy(runtime, case, selected, source, evidence, policy, expected_revision=1, *, continuous=False):
@@ -109,7 +156,7 @@ def run(args):
     queue = backend._request('/queue')
     if any(queue.get(key) for key in ('queue_running', 'queue_pending')):
         raise RuntimeError('the experiment requires an idle, dedicated ComfyUI queue')
-    manifest, case, question = pilot_inputs(args.seed)
+    manifest, case, question = STORIES[args.story](args.seed)
     if args.frame_notes:
         notes = json.loads(args.frame_notes.read_text(encoding='utf-8'))
         if set(notes) != set(case['shots']) or any(not isinstance(note, str) or not note.strip()
@@ -118,7 +165,10 @@ def run(args):
         case['shots'] = {shot: prompt + ' Frame observation: ' + notes[shot]
                          for shot, prompt in case['shots'].items()}
     args.output.mkdir(parents=True)
-    write_json(args.output / 'protocol.json', dict(seed=args.seed, manifest=manifest, case=case,
+    if args.story == 'hexagon-lamp':
+        # Keep the predeclared evaluation labels out of all model inputs.
+        write_json(args.output / 'visual_oracle.json', LAMP_ORACLE)
+    write_json(args.output / 'protocol.json', dict(story=args.story, seed=args.seed, manifest=manifest, case=case,
                question=question, policies=args.policies, text_model=args.text_model,
                vision_model=args.vision_model, frame_notes=bool(args.frame_notes), timeout=args.timeout,
                server=backend.base, continuous=args.continuous))
@@ -283,6 +333,7 @@ def main():
     parser.add_argument('--policies', nargs='+', choices=tuple(POLICIES),
                         default=['declared', 'checklist', 'raw_union', 'egdr', 'full'])
     parser.add_argument('--continuous', action='store_true', help='run the two-edit deferred-repair experiment')
+    parser.add_argument('--story', choices=tuple(STORIES), default='striped-press')
     parser.add_argument('--seed', type=int, default=88001)
     parser.add_argument('--frame-notes', type=Path,
                         help='optional independent observations from this seed, keyed by shot')
