@@ -1,0 +1,222 @@
+"""Paired verifier-only evaluation. No detector, worker, or render service calls."""
+import argparse
+import json
+from hashlib import sha256
+from pathlib import Path
+import subprocess
+from time import monotonic
+from zipfile import ZipFile
+
+from vision_probe import (
+    VERIFY_INSTRUCTIONS, VERIFY_SCHEMA, image_reply, parse_verification, parse_visual,
+)
+
+PART_LINKS = ['target', 'alternative', 'unresolved']
+SCHEMA = {
+    'type': 'object',
+    'required': ['panel', 'marker', 'part_link', 'evidence'],
+    'additionalProperties': False,
+    'properties': {
+        'panel': {'enum': [None, 1, 2, 3, 4]},
+        'marker': {'enum': PART_LINKS},
+        'part_link': {'enum': PART_LINKS},
+        'evidence': {'type': 'string'},
+    },
+}
+INSTRUCTIONS = (
+    'Verify object identity in the supplied source image. Inspect all panels before answering. '
+    'First identify a visible identity marker and then check whether the named part is visibly '
+    'attached to the same housing in that panel. Report marker and part_link separately. '
+    'Use target for the specified target instance and alternative for the explicitly excluded '
+    'instance. If any single panel shows the target marker and its attached named part, cite '
+    'that panel even if an alternative is also visible. Otherwise cite an alternative only '
+    'when its conflicting marker and its attached lookalike part are both visible together. '
+    'Never infer an alternative from missing evidence, color alone, occlusion, or a crop. '
+    'Do not combine evidence across panels. Use unresolved and null panel if no complete '
+    'association is visible. Name both the visible marker and its link to the part in evidence. '
+    'A single frame is panel 1. For a 2x2 sheet, panels are numbered in reading order.\n'
+)
+SINGLE_BASELINE = (
+    'Inspect this single source frame. Check identity, part, and position separately. '
+    'Return JSON with identity, part, and position as yes, no, or unknown. '
+    'If all three are yes, use panel 1 and describe the visible evidence. '
+    'Otherwise use a null panel. '
+)
+STATION_QUESTION = (
+    'In any one panel, is the round red pushbutton mounted on the navy station intercom '
+    'with an ivory triangular badge visible? An ivory plus-shaped badge marks a different intercom.'
+)
+FIXTURE = Path(__file__).with_name('fixtures') / 'egdr_evidence_resampling_v1.zip'
+
+
+def counterevidence_verdict(raw, panel_count):
+    row = json.loads(raw)
+    if (not isinstance(row, dict) or set(row) != set(SCHEMA['required'])
+            or row['marker'] not in PART_LINKS or row['part_link'] not in PART_LINKS
+            or not isinstance(row['evidence'], str)):
+        raise ValueError('invalid structured counterevidence')
+    panel = row['panel']
+    if panel is not None and (type(panel) is not int or not 1 <= panel <= panel_count):
+        raise ValueError('counterevidence cites a nonexistent panel')
+    if panel is None or not row['evidence'].strip() or row['marker'] != row['part_link']:
+        return 'unknown'
+    return {'target': 'match', 'alternative': 'distinct', 'unresolved': 'unknown'}[row['marker']]
+
+
+def ffmpeg(*args):
+    subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', *map(str, args)], check=True)
+
+
+def prepare_cases(lamp, output):
+    protocol = json.loads((lamp / 'protocol.json').read_text())
+    original = (lamp / 'responses.jsonl').read_bytes()
+    evidence = json.loads((lamp / 'evidence.json').read_text())
+    log_digest = sha256(original).hexdigest()
+    logged_digest = evidence['responses_sha256']
+    if log_digest != logged_digest:
+        print('Warning: exported lamp response log differs from the recorded digest. '
+              'Both digests are recorded; the original image digests are checked separately.',
+              flush=True)
+    rows = [json.loads(line) for line in original.splitlines()]
+    cases = []
+    for shot, gold in [('S2', 'distinct'), ('S3', 'match')]:
+        archived = [row for row in rows if row['probe'] == f'probe-{shot}']
+        detector = [row for row in archived if row['stage'] in ('detect', 'detect_retry')][-1]
+        detected = parse_visual(detector['raw'])
+        if detected['decision'] != 'yes':
+            raise ValueError(f'{shot}: archived detector did not nominate a panel')
+        panel = detected['panel']
+        previous = [row for row in archived if row['stage'].startswith('verify_isolated_panel')][-1]
+        frame = lamp / f'{shot}-panel-{panel}.png'
+        frame_bytes = frame.read_bytes()
+        if sha256(frame_bytes).hexdigest() != evidence['audit']['probes'][shot]['panels'][panel - 1]:
+            raise ValueError(f'{shot}: original verifier image digest mismatch')
+        image = output / f'lamp-{shot}.png'
+        image.write_bytes(frame_bytes)
+        cases.append(dict(id=f'lamp-{shot}', group='lamp_regression', gold=gold,
+                          image=image.name, panels=1, question=protocol['question'],
+                          archived_detector=detector, archived_verification=previous,
+                          source_panel=panel, archived_log_sha256=log_digest,
+                          recorded_log_sha256=logged_digest))
+    with ZipFile(FIXTURE) as bundle:
+        for shot in ('S1', 'S2', 'S3'):
+            clip = output / f'station-{shot}.mp4'
+            clip.write_bytes(bundle.read(f'station_intercom/{shot}.mp4'))
+            panels = ';'.join(
+                f'[{i}:v]scale=480:270,setsar=1[p{i}]' for i in range(4))
+            ffmpeg(*(arg for time in (0.2, 0.6, 1.0, 1.4) for arg in ('-ss', time, '-i', clip)),
+                   '-filter_complex_threads', 1, '-filter_complex',
+                   panels + ';[p0][p1][p2][p3]xstack=inputs=4:layout=0_0|w0_0|0_h0|w0_h0',
+                   '-frames:v', 1, '-threads', 1, output / f'station-{shot}.png')
+            clip.unlink()
+    # In the mixed sheet, the target appears only in the last panel.
+    ffmpeg('-i', output / 'station-S3.png', '-i', output / 'station-S1.png',
+           '-filter_complex_threads', 1, '-filter_complex',
+           '[1:v]crop=480:270:480:270[p];[0:v][p]overlay=480:270',
+           '-frames:v', 1, '-threads', 1, output / 'station-mixed.png')
+    # Hide the badge area while leaving the pushbutton visible in each panel.
+    for shot in ('S1', 'S3'):
+        boxes = ','.join(
+            f'drawbox=x={x}:y={y}:w=110:h=108:color=gray:t=fill'
+            for x in (220, 700) for y in (35, 305))
+        ffmpeg('-i', output / f'station-{shot}.png', '-vf', boxes,
+               '-frames:v', 1, '-threads', 1, output / f'station-occluded-{shot}.png')
+    for case_id, gold in (
+        ('S1', 'match'), ('S2', 'match'), ('S3', 'distinct'), ('mixed', 'match'),
+        ('occluded-S1', 'unknown'), ('occluded-S3', 'unknown'),
+    ):
+        cases.append(dict(id=f'station-{case_id}', group='station_transfer',
+                          gold=gold, image=f'station-{case_id}.png', panels=4,
+                          question=STATION_QUESTION))
+    for case in cases:
+        case['image_sha256'] = sha256((output / case['image']).read_bytes()).hexdigest()
+    return cases
+
+
+def summarize(rows):
+    report = {}
+    for group in ('lamp_regression', 'station_transfer'):
+        for method in ('baseline', 'counterevidence'):
+            subset = [row for row in rows if row['group'] == group and row['method'] == method]
+            report.setdefault(group, {})[method] = dict(
+                cases=len(subset),
+                clear_targets=sum(row['gold'] == 'match' for row in subset),
+                clear_non_targets=sum(row['gold'] == 'distinct' for row in subset),
+                occluded_cases=sum(row['gold'] == 'unknown' for row in subset),
+                missed_targets=sum(row['gold'] == 'match' and row['decision'] == 'distinct'
+                                   for row in subset),
+                non_target_retained=sum(row['gold'] == 'distinct' and row['decision'] != 'distinct'
+                                         for row in subset),
+                invalid_replies=sum('error' in row for row in subset),
+                excluded_occluded=sum(row['gold'] == 'unknown' and row['decision'] == 'distinct'
+                                      for row in subset),
+                confirmed_targets=sum(row['gold'] == 'match' and row['decision'] == 'match'
+                                      for row in subset),
+            )
+    return report
+
+
+def evaluate(cases, args, log):
+    rows = []
+    for index, case in enumerate(cases):
+        methods = ('baseline', 'counterevidence')
+        if index % 2:
+            methods = methods[::-1]
+        for method in methods:
+            if method == 'baseline':
+                instruction = SINGLE_BASELINE if case['panels'] == 1 else VERIFY_INSTRUCTIONS
+                schema = VERIFY_SCHEMA
+            else:
+                instruction, schema = INSTRUCTIONS, SCHEMA
+            print(f'{case["id"]} {method}', flush=True)
+            start = monotonic()
+            raw = image_reply(args.server, args.model, args.output / case['image'],
+                              instruction + case['question'], schema)
+            row = {key: case[key] for key in ('id', 'group', 'gold', 'image_sha256')}
+            row.update(method=method, raw=raw, seconds=monotonic() - start)
+            try:
+                if method == 'baseline':
+                    matched = parse_verification(raw)
+                    if matched and json.loads(raw)['panel'] > case['panels']:
+                        raise ValueError('baseline cites a nonexistent panel')
+                    row['decision'] = 'match' if matched else 'unknown'
+                else:
+                    row['decision'] = counterevidence_verdict(raw, case['panels'])
+            except ValueError as error:
+                row.update(decision='unknown', error=str(error))
+            log.write(json.dumps(row) + '\n')
+            log.flush()
+            rows.append(row)
+    return rows
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--lamp-run', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--server', default='http://127.0.0.1:11434')
+    parser.add_argument('--model', default='qwen2.5vl:7b-ctx8k')
+    parser.add_argument('--prepare-only', action='store_true')
+    args = parser.parse_args()
+    args.output.mkdir(parents=True, exist_ok=False)
+    cases = prepare_cases(args.lamp_run, args.output)
+    protocol = dict(model=args.model, cases=cases, model_options=dict(seed=42, temperature=0),
+                    decision_policy='retain on match or unknown, exclude on distinct',
+                    transfer_note='previously used rendered station clips plus mixed and masked controls',
+                    prompts=dict(single_baseline=SINGLE_BASELINE, baseline=VERIFY_INSTRUCTIONS,
+                                 counterevidence=INSTRUCTIONS),
+                    schemas=dict(baseline=VERIFY_SCHEMA, counterevidence=SCHEMA))
+    (args.output / 'protocol.json').write_text(json.dumps(protocol, indent=2) + '\n')
+    if args.prepare_only:
+        print(f'Prepared {len(cases)} cases')
+        return
+    with (args.output / 'responses.jsonl').open('w') as log:
+        rows = evaluate(cases, args, log)
+    report = dict(model_calls=len(rows), metrics=summarize(rows))
+    result = json.dumps(report, indent=2)
+    (args.output / 'report.json').write_text(result + '\n')
+    print(result)
+
+
+if __name__ == '__main__':
+    main()
