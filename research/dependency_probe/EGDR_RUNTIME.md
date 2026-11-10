@@ -178,3 +178,17 @@ with the chosen shots held fixed.
 python3 -u research/dependency_probe/run_egdr_prompt_pair.py \
   --source-run runs/egdr-online-01 --output runs/egdr-prompt-pair-01
 ```
+
+The follow-up compares the neutral scene description under the original
+recoloring instruction against a final-state instruction. The latter states
+that the wheel is scarlet red from its first visible frame and stays red
+whenever visible. The constraints on other objects remain identical. The
+two shots again use opposite condition orders and archived seed/render
+settings. Review first-visible-frame color, any within-shot color changes,
+target identity, and preservation of unrelated objects.
+
+```bash
+python3 -u research/dependency_probe/run_egdr_prompt_pair.py \
+  --compare-final-state \
+  --source-run runs/egdr-online-01 --output runs/egdr-final-state-pair-01
+```
