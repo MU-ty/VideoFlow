@@ -7,10 +7,57 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'research/dependency_probe'))
+from marker_review import MARKER_METHOD, compare_markers, validate_marker_rules
 from vision_probe import CONFLICT_METHOD, parse_conflict_review, parse_visual, run_case, visual_reply
 
 
 class VisionProbeTest(unittest.TestCase):
+    def test_marker_comparison_requires_resolved_excluded_identity_in_every_relevant_panel(self):
+        rules = validate_marker_rules(dict(part='dial', target=['two teal stripes'],
+                                           excluded=['orange diamond']))
+        rows = [dict(panel=i, status='linked', markers=['Orange diamond'],
+                     evidence='Dial and diamond share the housing.') for i in range(1, 5)]
+        score = lambda panels: compare_markers(json.dumps(dict(panels=panels)), rules)['decision']
+        self.assertEqual(score(rows), 'distinct')
+        self.assertEqual(score(rows[:-1] + [dict(rows[-1], status='absent', markers=[])]), 'distinct')
+        self.assertEqual(score(rows[:-1] + [dict(rows[-1], status='unclear', markers=[])]), 'unknown')
+        self.assertEqual(score(rows[:-1] + [dict(rows[-1], markers=['unlisted round marking'])]), 'unknown')
+        self.assertEqual(score(rows[:-1] + [dict(rows[-1], markers=['two teal stripes'])]), 'match')
+        with self.assertRaises(ValueError):
+            score(rows[:-1] + [rows[0]])
+
+    def test_marker_variant_withholds_identity_rules_and_preserves_old_comparator(self):
+        case = dict(id='edit', story='story', entity='striped press', attribute='color',
+                    edit='Recolor the dial', shots={'S1': 'anchor', 'S2': 'candidate'},
+                    declared=['S1'], gold=['S1'])
+        sheets = {shot: Path(f'{shot}.jpg') for shot in case['shots']}
+        rules = validate_marker_rules(dict(part='ribbed dial', target=['two teal stripes'],
+                                           excluded=['orange diamond']))
+        negatives = '{"decision":"no","panel":null,"evidence":"a different housing"}'
+        unknown = '{"decision":"unknown","panel":null,"identity_marker":"","evidence":""}'
+        markers = json.dumps(dict(panels=[
+            dict(panel=i, status='linked', markers=['orange diamond'], evidence='Mounted on housing.')
+            for i in range(1, 5)
+        ]))
+        logs = []
+        with patch('vision_probe.predict', return_value=(['S2'], '{}')), \
+             patch('vision_probe.visual_reply', return_value=negatives), \
+             patch('vision_probe.image_reply', side_effect=[unknown, markers]) as reply:
+            result = run_case(case, sheets, 'server', 'text-model', 'vision-model', logs.append,
+                              visibility_question='Is the striped press dial visible?',
+                              verify_visual=True, review_conflicts=True, marker_rules=rules)
+        methods = {row['method']: row for row in result['results']}
+        self.assertEqual(methods[CONFLICT_METHOD]['selected'], ['S1', 'S2'])
+        self.assertEqual(methods[MARKER_METHOD]['selected'], ['S1'])
+        self.assertEqual(result['marker_removed'], ['S2'])
+        self.assertEqual(result['marker_calls'], 1)
+        prompt = reply.call_args.args[3]
+        self.assertIn('ribbed dial', prompt)
+        self.assertNotIn('orange diamond', prompt)
+        self.assertNotIn('teal stripes', prompt)
+        self.assertNotIn('Recolor', prompt)
+        self.assertEqual(logs[-1]['method'], 'vision_marker_review')
+
     def test_conflict_review_removes_only_soft_seeds_with_confirmed_distinct_identity(self):
         shots = ('anchor', 'match', 'decoy', 'unknown', 'unclear', 'malformed', 'hard', 'decoy_child')
         case = dict(id='edit', story='story', entity='dial', attribute='color',

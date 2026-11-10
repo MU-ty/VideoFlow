@@ -1,0 +1,31 @@
+{
+  "press-identity-control": {
+    "part": "ribbed handwheel",
+    "target": [
+      "two teal stripes",
+      "two parallel teal stripes",
+      "2 teal stripes",
+      "2 parallel teal stripes",
+      "two teal bands",
+      "two horizontal teal stripes",
+      "two teal horizontal stripes",
+      "two parallel blue-green stripes",
+      "two green stripes",
+      "two horizontal green stripes",
+      "two parallel green stripes"
+    ],
+    "excluded": [
+      "orange diamond",
+      "orange diamond marking",
+      "orange diamond marker",
+      "orange diamond shape",
+      "orange diamond badge",
+      "orange diamond-shaped marking",
+      "orange diamond-shaped marker",
+      "orange diamond-shaped badge",
+      "orange diamond-shaped emblem",
+      "orange rhombus",
+      "orange rhombus marker"
+    ]
+  }
+}
