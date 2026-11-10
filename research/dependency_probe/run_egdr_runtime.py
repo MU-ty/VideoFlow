@@ -9,7 +9,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from artifacts import archive_current, write_json
 from asset_runtime import AssetRuntime, Conflict, fingerprint
-from asset_worker import pass_once
+from asset_worker import build_h3, pass_once
 from comfyui import ComfyUI
 from provider_audit import capture_environment, summarize_inspections
 from vision_probe import collect_selections, make_sheet
@@ -107,6 +107,98 @@ LAMP_ORACLE = {
 }
 
 
+# Frame-0 contours measured once on the accepted seed-88101 source clips.
+LAMP_REFERENCE_REGIONS = {
+    'S1': (
+        '10181e006a1a0d9eb0e7449fd4f4cdf0f33c4117eae776b2c4fac26bcb85759f',
+        ((244, 201), (245, 186), (248, 171), (256, 152), (270, 137), (287, 123),
+         (308, 109), (331, 98), (355, 90), (383, 85), (411, 82), (447, 82),
+         (475, 84), (501, 89), (526, 97), (550, 107), (571, 121), (588, 137),
+         (600, 154), (608, 174), (612, 201), (566, 200), (513, 199), (462, 198),
+         (407, 198), (354, 199), (295, 200)),
+    ),
+    'S3': (
+        'b6fbd63b16fda9d20dc4c6b4ae41b62aa1e1070aaa2fae88208367f8828b19cd',
+        ((252, 242), (254, 222), (259, 201), (269, 179), (283, 158), (301, 138),
+         (322, 118), (347, 100), (372, 87), (398, 77), (427, 72), (454, 71),
+         (482, 74), (506, 81), (532, 92), (554, 107), (573, 125), (590, 147),
+         (601, 169), (610, 193), (616, 217), (618, 246), (577, 249), (530, 250),
+         (473, 250), (409, 250), (351, 248), (298, 246)),
+    ),
+}
+
+
+def make_lamp_reference(clip, output, shot):
+    from artifacts import checksum
+    from run_egdr_reference_pair import HEIGHT, WIDTH, ffmpeg as rgb_ffmpeg, polygon_spans
+
+    expected, outline = LAMP_REFERENCE_REGIONS[shot]
+    if checksum(clip) != expected:
+        raise ValueError(f'{shot}: lamp reference contour is calibrated to different source bytes')
+    raw = rgb_ffmpeg('-i', clip, '-map', '0:v:0', '-frames:v', 1, '-pix_fmt', 'rgb24',
+                     '-threads', 1, '-f', 'rawvideo', 'pipe:1')
+    if len(raw) != WIDTH * HEIGHT * 3:
+        raise ValueError(f'{shot}: expected a {WIDTH}x{HEIGHT} first frame')
+    edited = bytearray(raw)
+    changed = 0
+    for y in range(HEIGHT):
+        for start, end in polygon_spans(outline, y + 0.5):
+            for x in range(int(start + 0.5), int(end + 0.5)):
+                i = (y * WIDTH + x) * 3
+                r, g, b = raw[i:i + 3]
+                light = (r + 2 * g + b) // 4
+                red = (min(255, light * 5 // 4), light * 3 // 16, light * 4 // 16)
+                changed += tuple(raw[i:i + 3]) != red
+                edited[i:i + 3] = bytes(red)
+    rgb_ffmpeg('-f', 'rawvideo', '-pixel_format', 'rgb24', '-video_size', f'{WIDTH}x{HEIGHT}',
+               '-i', 'pipe:0', '-frames:v', 1, '-threads', 1, output, data=edited)
+    return dict(sha256=checksum(output), source_video_sha256=expected, frame_index=0,
+                shade_outline=outline, changed_pixels=changed, file=output.name)
+
+
+def prepare_lamp_builder(root, source, backend):
+    from recovery_reference_comfy import check_backend, upload_frame
+    from run_egdr_reference_pair import condition
+
+    check_backend(backend)
+    references = {}
+    for shot in LAMP_REFERENCE_REGIONS:
+        path = root / f'{shot}-lamp-reference.png'
+        references[shot] = make_lamp_reference(root / 'source' / source[shot]['file'], path, shot)
+    for shot, entry in references.items():
+        entry['provider_image'] = upload_frame(backend, root / entry['file'], entry['sha256'])
+    write_json(root / 'reference_plan.json', references)
+
+    def build(inputs, job):
+        graph = build_h3(inputs, job)
+        entry = references.get(inputs['asset'])
+        if entry is None:
+            return graph
+        prompt = graph['5']['inputs']['prompt']
+        scene, separator, _ = prompt.partition(' Apply the following appearance instruction')
+        if not separator:
+            raise ValueError('missing lamp appearance slot')
+        graph['5']['inputs']['prompt'] = (
+            scene.replace('solid silver metal dome shade', 'scarlet red metal dome shade')
+            + ' Keep the shade scarlet red from the first visible frame through the end. '
+            'Preserve the cream base, black hexagon, desk, and background.'
+        )
+        return condition(graph, entry['provider_image'])
+    return build
+
+
+def wait_conditioned(folder, runtime, backend, build, predicate, timeout, poll):
+    from run_egdr_conditioned_replay import step
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        step(folder, runtime, backend, build, max(0, 2 - len(runtime.unresolved_remote())))
+        if predicate():
+            return
+        time.sleep(poll)
+    raise TimeoutError(f'timed out: {folder}')
+
+
 def apply_policy(runtime, case, selected, source, evidence, policy, expected_revision=1, *, continuous=False):
     target = case.get('target', 'S1')
     event_id = case['id'] if expected_revision == 1 else f"{case['id']}-{expected_revision}"
@@ -128,8 +220,8 @@ def apply_policy(runtime, case, selected, source, evidence, policy, expected_rev
     return runtime.edit(event)
 
 
-def submit_anchor(folder, runtime, backend, epoch):
-    events = pass_once(runtime, backend, max_submit=1)
+def submit_anchor(folder, runtime, backend, epoch, build=build_h3):
+    events = pass_once(runtime, backend, build=build, max_submit=1)
     with (folder / 'worker.jsonl').open('a', encoding='utf-8') as out:
         out.write(json.dumps(dict(at=time.time(), events=events)) + '\n')
     if not any(j['asset'] == 'S1' and j['revision'] == epoch and j['status'] == 'submitted'
@@ -171,7 +263,8 @@ def run(args):
     write_json(args.output / 'protocol.json', dict(story=args.story, seed=args.seed, manifest=manifest, case=case,
                question=question, policies=args.policies, text_model=args.text_model,
                vision_model=args.vision_model, frame_notes=bool(args.frame_notes), timeout=args.timeout,
-               server=backend.base, continuous=args.continuous))
+               server=backend.base, continuous=args.continuous,
+               lamp_reference_frames=args.lamp_reference_frames))
     if args.source_run:
         source_protocol = json.loads((args.source_run / 'protocol.json').read_text(encoding='utf-8'))
         if source_protocol['manifest'] != manifest or source_protocol['server'] != backend.base:
@@ -203,6 +296,8 @@ def run(args):
             raise RuntimeError('evidence frames do not match the frozen source clips')
         if args.source_only:
             return
+        final_builder = (prepare_lamp_builder(args.output, source, backend)
+                         if args.lamp_reference_frames else build_h3)
         raw = []
         started = time.monotonic()
         if args.continuous:
@@ -253,7 +348,7 @@ def run(args):
                     red = dict(case, edit=case['edit'].replace('cobalt blue', 'scarlet red'))
                     plan = apply_policy(runtime, red, selected, source, evidence, policy,
                                         expected_revision=2, continuous=True)
-                    submit_anchor(folder, runtime, backend, 3)
+                    submit_anchor(folder, runtime, backend, 3, final_builder)
                     if policy == 'online_egdr':
                         for shot, probe in probes.items():
                             decision = {'yes': 'match', 'no': 'distinct', 'unknown': 'fallback'}[probe['decision']]
@@ -274,8 +369,11 @@ def run(args):
                         return None
                     return runtime.snapshot()['timeline']
 
-                wait_for(folder, runtime, backend, 'videoflow', published,
-                         time.monotonic() + args.timeout, args.poll)
+                if args.lamp_reference_frames:
+                    wait_conditioned(folder, runtime, backend, final_builder, published, args.timeout, args.poll)
+                else:
+                    wait_for(folder, runtime, backend, 'videoflow', published,
+                             time.monotonic() + args.timeout, args.poll)
                 after = archive_current(runtime, folder / 'media', backend.base, probe=True)
                 reused = sorted(row['asset'] for row in after['assets']
                                 if all(row[field] == source[row['asset']][field]
@@ -313,6 +411,25 @@ def run(args):
                                scheduled_jobs=len(jobs), video_outputs=sum(j['remote_state'] == 'succeeded'
                                                                           for j in measured_jobs),
                                stale_jobs=stale, obsolete_evidence_rejected=obsolete_evidence_rejected)
+                if args.lamp_reference_frames:
+                    references = json.loads((args.output / 'reference_plan.json').read_text())
+                    bindings = {}
+                    for job in jobs:
+                        if job['status'] != 'succeeded':
+                            continue
+                        workflow = json.loads(job['execution_json'])
+                        expected = references.get(job['asset'])
+                        if expected is None:
+                            if 'first_frame' in workflow['5']['inputs']:
+                                raise RuntimeError(f"unexpected reference for {job['asset']}")
+                            continue
+                        if (workflow['5']['inputs'].get('first_frame') != ['15', 0]
+                                or workflow['15']['inputs']['image'] != expected['provider_image']):
+                            raise RuntimeError(f"wrong final reference for {job['asset']}")
+                        bindings[job['asset']] = expected['provider_image']
+                    if set(bindings) != final_selection.intersection(references):
+                        raise RuntimeError('conditioned final renders disagree with the committed plan')
+                    row['reference_bindings'] = bindings
                 write_json(folder / 'report.json', row)
                 rows.append(row)
             finally:
@@ -335,6 +452,8 @@ def main():
     parser.add_argument('--continuous', action='store_true', help='run the two-edit deferred-repair experiment')
     parser.add_argument('--story', choices=tuple(STORIES), default='striped-press')
     parser.add_argument('--seed', type=int, default=88001)
+    parser.add_argument('--lamp-reference-frames', action='store_true',
+                        help='use the verified seed-88101 shade contours for final target renders')
     parser.add_argument('--frame-notes', type=Path,
                         help='optional independent observations from this seed, keyed by shot')
     source = parser.add_mutually_exclusive_group()
@@ -346,6 +465,9 @@ def main():
     args = parser.parse_args()
     if not all(0 < value < float('inf') for value in (args.poll, args.timeout)):
         parser.error('timeout and poll must be finite and positive')
+    if args.lamp_reference_frames and not (args.story == 'hexagon-lamp' and args.seed == 88101
+                                            and args.source_run and args.continuous):
+        parser.error('--lamp-reference-frames requires --story hexagon-lamp --seed 88101 --source-run and --continuous')
     continuous_policies = {'worklist', 'online_egdr', 'full'}
     if args.continuous and not set(args.policies) <= continuous_policies:
         parser.error('--continuous requires --policies worklist online_egdr full (or a subset)')
