@@ -86,3 +86,39 @@ python3 -u research/dependency_probe/vision_evidence_reuse.py live \
 ```
 
 `responses.jsonl` stores actual detector and verifier replies. `report.json` scores each arm and reports the model calls each policy would require with those replies. The capture deliberately queries even requests a cache would skip, so the totals are counterfactual call counts. This protocol measures visibility and selection for the supplied panels. H3 rendering and the production runtime are outside the experiment.
+
+## Two-story decoded-frame resampling
+
+The frozen bundle contains six newly authored Blender clips. Station Intercom uses a
+triangular badge to identify the red pushbutton's intercom. Weather Beacon uses three
+dots to identify the yellow indicator's housing. S1 and S2 are positives and S3 is a
+similar-looking device with a different marker in each story. Both stories use three
+distinct four-second clips at 12 fps. Ground truth follows the rendered geometry and
+is never sent to the model.
+
+The experiment decodes each source video to 48 frames and uniformly samples four
+frame indices from a specified trim window. The four scored trim windows were drawn
+before any model evaluation with `random.Random(20261110).sample` from the 24 ordered
+head/tail trim pairs in [0, 4] frames, excluding (0, 0). The remaining windows are
+covered in the geometry-only sweep. Each matched control changes three sampled
+indices. One control retains the original verified frame and the other retains a
+different original frame. If the original probe has no verified frame, the controls
+use a nominal index and exclude that probe from witness-survival counts.
+
+Each resampling starts with the same original capture for its story and a fresh
+copy of each policy's cache. Costs for the six alternatives exclude that shared
+original capture, reported separately. The paired capture queries all inputs and
+then replays three policies over the recorded replies. Selection scores and estimated
+calls require model replies. The geometry-only sweep measures the chance to retain
+a particular frame under this trim grid and does not measure editing-workload frequency.
+
+```bash
+python3 -u research/dependency_probe/vision_evidence_resampling.py \
+  --server http://127.0.0.1:11434 --model qwen2.5vl:7b-ctx8k \
+  --output runs/egdr-evidence-resampling-01
+```
+
+Use `--story station_intercom` or `--story weather_beacon` to capture separately.
+Use `--prepare-only` to generate `sampling.json` and the decoded frames without an
+Ollama instance. A live run writes `report.json` and `responses.jsonl`. The resampled
+frame indices, source digests and selected witness digests are included for audit.
