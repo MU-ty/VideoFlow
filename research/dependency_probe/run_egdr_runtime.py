@@ -190,15 +190,47 @@ LAMP_REFERENCE_REGIONS = {
 }
 
 
-def make_conditioned_reference(clip, output, shot, expected, outline, region_name):
+# Post-hoc source-anchored diagnostic only. The original frame-0 eligibility failed.
+LUNCHBOX_DIAGNOSTIC_SCOPE = 'post_hoc_reference_frame_sensitivity'
+LUNCHBOX_DIAGNOSTIC_FRAMES = {'S1': 44, 'S3': 0}
+LUNCHBOX_DIAGNOSTIC_SHA256 = {'S1': 'ae9a31b283c65ca70316f0c2dcd61f24fe3bc682beb441ffd571ac70eea99e34',
+ 'S2': '0ee9e1262c7f232d354d21429ff9a3d984b3019634216110ee7b4f96cfa77cdf',
+ 'S3': '17bb3a8d5ea30e057611241019227d8f35dce1daab35eebd78b68fdc104fa79f',
+ 'S4': '16d30582fdc9c1a6e12d1239e5571b9468f91d948b981cd832565bfe275e04b7'}
+LUNCHBOX_DIAGNOSTIC_OUTLINES = {
+    'S1': ((257,103), (258,88), (261,74), (267,61), (277,49), (291,39), (310,31),
+           (332,24), (359,17), (392,12), (420,9), (448,9), (480,12), (509,17),
+           (540,24), (563,33), (581,43), (592,55), (599,68), (605,85), (608,103),
+           (607,144), (606,180), (605,216), (603,225), (598,228), (594,226),
+           (594,190), (594,155), (595,116), (595,98), (592,80), (587,68),
+           (579,59), (568,55), (555,53), (545,57), (533,58), (525,57), (514,52),
+           (503,51), (491,55), (479,55), (470,54), (462,50), (452,49),
+           (442,54), (430,55), (418,54), (408,49), (398,49), (387,52), (378,55),
+           (366,54), (357,50), (348,50), (338,54), (326,57), (315,55), (305,51),
+           (293,53), (281,61), (274,72), (271,87), (269,104), (269,133), (268,164),
+           (269,196), (269,225), (262,225), (258,222), (257,211)),
+    'S3': ((249,146), (251,128), (257,114), (265,102), (278,90), (294,79), (313,68),
+           (337,57), (365,48), (394,40), (425,35), (455,34), (478,35), (495,40),
+           (509,50), (520,63), (529,79), (536,97), (542,118), (544,132), (535,132),
+           (525,124), (511,121), (506,106), (500,91), (493,77), (483,66), (472,59),
+           (462,57), (454,59), (440,64), (425,70), (409,75), (389,83), (369,88),
+           (351,94), (334,98), (316,99), (305,101), (294,108), (287,119), (283,132),
+           (281,149), (282,168), (284,189), (288,211), (293,232), (297,255),
+           (299,278), (297,292), (291,300), (282,303), (272,299), (266,290),
+           (264,280), (263,261), (261,242), (257,220), (254,198), (251,179), (249,158)),
+}
+
+
+def make_conditioned_reference(clip, output, shot, expected, outline, region_name, frame_index=0):
     from run_egdr_reference_pair import HEIGHT, WIDTH, ffmpeg as rgb_ffmpeg, polygon_spans
 
     if checksum(clip) != expected:
         raise ValueError(f'{shot}: reference contour is calibrated to different source bytes')
-    raw = rgb_ffmpeg('-i', clip, '-map', '0:v:0', '-frames:v', 1, '-pix_fmt', 'rgb24',
+    selector = ('-vf', rf'select=eq(n\,{frame_index})') if frame_index else ()
+    raw = rgb_ffmpeg('-i', clip, '-map', '0:v:0', *selector, '-frames:v', 1, '-pix_fmt', 'rgb24',
                      '-threads', 1, '-f', 'rawvideo', 'pipe:1')
     if len(raw) != WIDTH * HEIGHT * 3:
-        raise ValueError(f'{shot}: expected a {WIDTH}x{HEIGHT} first frame')
+        raise ValueError(f'{shot}: expected a {WIDTH}x{HEIGHT} frame at index {frame_index}')
     edited = bytearray(raw)
     changed = 0
     for y in range(HEIGHT):
@@ -214,23 +246,25 @@ def make_conditioned_reference(clip, output, shot, expected, outline, region_nam
         raise ValueError(f'{shot}: reference contour changed zero pixels')
     rgb_ffmpeg('-f', 'rawvideo', '-pixel_format', 'rgb24', '-video_size', f'{WIDTH}x{HEIGHT}',
                '-i', 'pipe:0', '-frames:v', 1, '-threads', 1, output, data=edited)
-    return dict(sha256=checksum(output), source_video_sha256=expected, frame_index=0,
+    return dict(sha256=checksum(output), source_video_sha256=expected, frame_index=frame_index,
                 changed_pixels=changed, file=output.name, **{region_name: outline})
 
 
-def prepare_conditioned_builder(root, source, backend, regions, story):
+def prepare_conditioned_builder(root, source, backend, regions, story, *, reference_frames=None):
     from recovery_reference_comfy import check_backend, upload_frame
     from run_egdr_reference_pair import condition
 
     check_backend(backend)
     references = {}
+    reference_frames = reference_frames or {}
     lamp = story == 'hexagon-lamp'
     region_name = 'shade_outline' if lamp else 'handle_outline'
     reference_name = {radio.STORY: 'radio', radio.LUNCHBOX_STORY: 'lunchbox'}.get(story, 'lamp')
     for shot, (digest, outline) in regions.items():
         path = root / f'{shot}-{reference_name}-reference.png'
         references[shot] = make_conditioned_reference(
-            root / 'source' / source[shot]['file'], path, shot, digest, outline, region_name)
+            root / 'source' / source[shot]['file'], path, shot, digest, outline, region_name,
+            frame_index=reference_frames.get(shot, 0))
     for shot, entry in references.items():
         entry['provider_image'] = upload_frame(backend, root / entry['file'], entry['sha256'])
     write_json(root / 'reference_plan.json', references)
@@ -356,11 +390,16 @@ def run(args):
         'oracle_labels_sha256': checksum(args.oracle_labels) if args.oracle_labels else None,
     }
                        if args.story in radio.HOLDOUTS else {})
+    if args.lunchbox_later_reference:
+        protocol_fields.update(analysis_scope=LUNCHBOX_DIAGNOSTIC_SCOPE,
+                               original_source_eligible=False,
+                               original_source_failure='S1 grip cropped at frame 0',
+                               reference_frame_indices=LUNCHBOX_DIAGNOSTIC_FRAMES)
     write_json(args.output / 'protocol.json', dict(story=args.story, seed=args.seed, manifest=manifest, case=case,
                question=question, policies=args.policies, text_model=args.text_model,
                vision_model=args.vision_model, frame_notes=bool(args.frame_notes), timeout=args.timeout,
                server=backend.base, continuous=args.continuous,
-               lamp_reference_frames=args.lamp_reference_frames, oracle_labels=bool(args.oracle_labels),
+               lamp_reference_frames=args.lamp_reference_frames, oracle_labels=bool(args.oracle_labels or args.lunchbox_later_reference),
                **protocol_fields))
     if args.source_run:
         source_protocol = json.loads((args.source_run / 'protocol.json').read_text(encoding='utf-8'))
@@ -389,8 +428,11 @@ def run(args):
                 raise RuntimeError('provider source bytes differ from the frozen run')
         source = {row['asset']: row for row in before['assets']}
         oracle_verdicts = {}
-        if args.oracle_labels:
-            labels = json.loads(args.oracle_labels.read_text(encoding='utf-8'))
+        if args.lunchbox_later_reference:
+            labels = dict(target_shots=list(radio.TARGETS), source_sha256=LUNCHBOX_DIAGNOSTIC_SHA256)
+        else:
+            labels = json.loads(args.oracle_labels.read_text(encoding='utf-8')) if args.oracle_labels else None
+        if labels is not None:
             oracle_verdicts = bind_oracle(labels, source, case)
             write_json(args.output / 'oracle_labels.json', labels)
         sheets = {shot: args.output / 'source' / f'{shot}.jpg' for shot in source}
@@ -401,11 +443,17 @@ def run(args):
         if args.source_only:
             return
         regions = LAMP_REFERENCE_REGIONS if args.lamp_reference_frames else {}
-        if args.reference_regions:
+        reference_frames = None
+        if args.lunchbox_later_reference:
+            regions = {shot: (LUNCHBOX_DIAGNOSTIC_SHA256[shot], outline)
+                       for shot, outline in LUNCHBOX_DIAGNOSTIC_OUTLINES.items()}
+            reference_frames = LUNCHBOX_DIAGNOSTIC_FRAMES
+        elif args.reference_regions:
             regions = json.loads(args.reference_regions.read_text(encoding='utf-8'))
             if set(regions) != set(radio.TARGETS):
                 raise ValueError('expected the two preregistered conditioned target shots')
-        final_builder = (prepare_conditioned_builder(args.output, source, backend, regions, args.story)
+        final_builder = (prepare_conditioned_builder(
+            args.output, source, backend, regions, args.story, reference_frames=reference_frames)
                          if regions else build_h3)
         raw = []
         started = time.monotonic()
@@ -550,8 +598,12 @@ def run(args):
                 rows.append(row)
             finally:
                 runtime.close()
-        write_json(args.output / 'report.json', dict(evidence='real_H3_unreviewed_quality',
-                   source_timeline_hash=before['timeline_hash'], rows=rows))
+        report = dict(evidence='real_H3_unreviewed_quality',
+                      source_timeline_hash=before['timeline_hash'], rows=rows)
+        if args.lunchbox_later_reference:
+            report.update(analysis_scope=LUNCHBOX_DIAGNOSTIC_SCOPE, original_source_eligible=False,
+                          reference_frame_indices=LUNCHBOX_DIAGNOSTIC_FRAMES)
+        write_json(args.output / 'report.json', report)
     finally:
         original.close()
 
@@ -574,6 +626,8 @@ def main():
                         help='use the verified seed-88101 shade contours for final target renders')
     parser.add_argument('--reference-regions', type=Path,
                         help='verified holdout source digests and first-frame handle contours')
+    parser.add_argument('--lunchbox-later-reference', action='store_true',
+                        help='run the post-hoc, hash-bound frame-44 reference diagnostic on the original source')
     parser.add_argument('--frame-notes', type=Path,
                         help='optional independent observations from this seed, keyed by shot')
     source = parser.add_mutually_exclusive_group()
@@ -588,12 +642,17 @@ def main():
     if args.lamp_reference_frames and not (args.story == 'hexagon-lamp' and args.seed == 88101
                                             and args.source_run and args.continuous):
         parser.error('--lamp-reference-frames requires --story hexagon-lamp --seed 88101 --source-run and --continuous')
+    if args.lunchbox_later_reference and not (
+        args.story == radio.LUNCHBOX_STORY and args.source_run and not args.oracle_labels
+        and not args.reference_regions
+    ):
+        parser.error('--lunchbox-later-reference requires the original lunchbox source and its built-in labels')
     if args.story in radio.HOLDOUTS:
         seed, _ = radio.HOLDOUTS[args.story]
         if (args.seed, args.timeout, args.poll) != (seed, 1800, 3) or args.frame_notes:
             parser.error('the holdout requires its frozen seed, timeout, poll and no frame notes')
-        if not args.source_only and not (args.source_run and args.continuous and args.oracle_labels
-                                         and args.reference_regions
+        reference_ready = args.lunchbox_later_reference or (args.oracle_labels and args.reference_regions)
+        if not args.source_only and not (args.source_run and args.continuous and reference_ready
                                          and tuple(args.policies) == radio.POLICIES
                                          and args.vision_model == 'qwen2.5vl:7b-ctx8k'):
             parser.error('the holdout requires the frozen four-arm conditioned protocol')
@@ -605,7 +664,7 @@ def main():
     if not args.continuous and DEFERRED_POLICIES.intersection(args.policies):
         parser.error('online_egdr and oracle_egdr require --continuous')
     if 'oracle_egdr' in args.policies:
-        if not args.oracle_labels or not args.source_run:
+        if not (args.oracle_labels or args.lunchbox_later_reference) or not args.source_run:
             parser.error('oracle_egdr requires --oracle-labels and a frozen --source-run')
     elif args.oracle_labels:
         parser.error('--oracle-labels requires oracle_egdr in --policies')
