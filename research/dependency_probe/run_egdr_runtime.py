@@ -1,5 +1,6 @@
 """Run a matched real-render EGDR pilot from one published source revision."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -149,8 +150,34 @@ def lunchbox_inputs(seed):
     ), question
 
 
+def canister_inputs(seed):
+    body = 'a teal cylindrical storage canister with a broad flat yellow lid'
+    target = f'{body} and one large white diamond on its teal body'
+    framing = ('The entire canister is centered and occupies about half the image height. '
+               'Leave generous space above the lid and around the canister from the first frame. '
+               'Seamless light-gray background. Camera and object stay still.')
+    shots = {
+        'S1': f'Locked medium product shot from slightly above the front of {target}. {framing}',
+        'S2': f'Locked medium product shot of {body} and one large white circle on its teal body. {framing}',
+        'S3': f'Locked three-quarter medium product shot from slightly above {target}. {framing}',
+        'S4': 'Locked medium product shot of one smooth gray stone centered on a seamless pale '
+              'gray studio sweep. The smooth backdrop and tabletop fill the entire frame.',
+    }
+    edit = (f'Recolor only the broad flat yellow lid of {target} to cobalt blue wherever visible. '
+            'Preserve the teal body and white diamond. Keep the circle-marked canister, stone '
+            'and other contents unchanged. Do not add a canister or lid where absent.')
+    question = ('In any single source panel, is a broad flat yellow lid visibly on a teal '
+                'canister whose own body has a large white diamond? '
+                'A white circle or a mark on another object does not count.')
+    return color_manifest(shots, seed), dict(
+        id=radio.CANISTER_STORY, entity=f'lid of {target}', attribute='color',
+        edit=edit, shots=shots, declared=['S1'],
+    ), question
+
+
 STORIES = {'striped-press': pilot_inputs, 'hexagon-lamp': lamp_inputs,
-           radio.STORY: radio_inputs, radio.LUNCHBOX_STORY: lunchbox_inputs}
+           radio.STORY: radio_inputs, radio.LUNCHBOX_STORY: lunchbox_inputs,
+           radio.CANISTER_STORY: canister_inputs}
 LAMP_ORACLE = {
     'source': {
         'S1': 'Silver dome shade and black hexagon visibly belong to the same lamp',
@@ -246,7 +273,8 @@ def make_conditioned_reference(clip, output, shot, expected, outline, region_nam
         raise ValueError(f'{shot}: reference contour changed zero pixels')
     rgb_ffmpeg('-f', 'rawvideo', '-pixel_format', 'rgb24', '-video_size', f'{WIDTH}x{HEIGHT}',
                '-i', 'pipe:0', '-frames:v', 1, '-threads', 1, output, data=edited)
-    return dict(sha256=checksum(output), source_video_sha256=expected, frame_index=frame_index,
+    return dict(sha256=checksum(output), source_shot=shot, source_video_sha256=expected,
+                frame_index=frame_index, decoded_source_frame_sha256=hashlib.sha256(raw).hexdigest(),
                 changed_pixels=changed, file=output.name, **{region_name: outline})
 
 
@@ -258,8 +286,13 @@ def prepare_conditioned_builder(root, source, backend, regions, story, *, refere
     references = {}
     reference_frames = reference_frames or {}
     lamp = story == 'hexagon-lamp'
-    region_name = 'shade_outline' if lamp else 'handle_outline'
-    reference_name = {radio.STORY: 'radio', radio.LUNCHBOX_STORY: 'lunchbox'}.get(story, 'lamp')
+    region_name = {
+        'hexagon-lamp': 'shade_outline',
+        radio.CANISTER_STORY: 'lid_outline',
+    }.get(story, 'handle_outline')
+    reference_name = {
+        radio.STORY: 'radio', radio.LUNCHBOX_STORY: 'lunchbox', radio.CANISTER_STORY: 'canister',
+    }.get(story, 'lamp')
     for shot, (digest, outline) in regions.items():
         path = root / f'{shot}-{reference_name}-reference.png'
         references[shot] = make_conditioned_reference(
@@ -282,6 +315,10 @@ def prepare_conditioned_builder(root, source, backend, regions, story, *, refere
             scene = (scene.replace('solid silver metal dome shade', 'scarlet red metal dome shade')
                      + ' Keep the shade scarlet red from the first visible frame through the end. '
                        'Preserve the cream base, black hexagon, desk, and background.')
+        elif story == radio.CANISTER_STORY:
+            scene = (scene.replace('broad flat yellow lid', 'broad flat scarlet red lid')
+                     + ' Keep the entire lid solid scarlet red through the end. '
+                       'Preserve the teal body, white diamond, and background.')
         else:
             preserved = ('the purple shell, white star and background'
                          if story == radio.LUNCHBOX_STORY else 'the mint-green body, white X, and background')
@@ -594,12 +631,20 @@ def run(args):
                     if set(bindings) != final_selection.intersection(references):
                         raise RuntimeError('conditioned final renders disagree with the committed plan')
                     row['reference_bindings'] = bindings
+                if args.story == radio.CANISTER_STORY:
+                    uses_vlm = policy == 'online_egdr'
+                    row['vlm_calls'] = sum(p['calls'] for p in probes.values()) if uses_vlm else 0
+                    row['vlm_wall_seconds'] = evidence_seconds if uses_vlm else 0
+                    row['gpu_seconds'] = history['gpu_seconds']
                 write_json(folder / 'report.json', row)
                 rows.append(row)
             finally:
                 runtime.close()
         report = dict(evidence='real_H3_unreviewed_quality',
                       source_timeline_hash=before['timeline_hash'], rows=rows)
+        if args.story == radio.CANISTER_STORY:
+            report.update(analysis_scope='prespecified_single_story',
+                          reference_frame_indices=dict.fromkeys(radio.TARGETS, 0))
         if args.lunchbox_later_reference:
             report.update(analysis_scope=LUNCHBOX_DIAGNOSTIC_SCOPE, original_source_eligible=False,
                           reference_frame_indices=LUNCHBOX_DIAGNOSTIC_FRAMES)
