@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+from collections import defaultdict
 import json
 from pathlib import Path
 import random
@@ -18,9 +19,11 @@ SHOTS = ('S1', 'S2', 'S3', 'S4')
 POLICIES = ('worklist', 'oracle_egdr', 'online_egdr', 'full')
 PROTOCOL = Path(__file__).with_name('EGDR_RADIO_HOLDOUT.md')
 LUNCHBOX_STORY = 'star-lunchbox'
+CANISTER_STORY = 'diamond-canister'
 HOLDOUTS = {
     STORY: (SEED, PROTOCOL),
     LUNCHBOX_STORY: (89201, PROTOCOL.with_name('EGDR_LUNCHBOX_HOLDOUT.md')),
+    CANISTER_STORY: (90421, PROTOCOL.with_name('EGDR_CANISTER_HOLDOUT.md')),
 }
 FIELDS = ('clip', 'edit', 'unintended', 'timestamps_and_notes')
 
@@ -71,14 +74,16 @@ def frames(source_run, output):
 
 
 def bind(source_run, annotation, output):
-    check_protocol(source_run)
+    protocol = check_protocol(source_run)
     _, assets, _ = verified_media(source_run / 'source', 1)
     row = load(annotation)
     if row['source_eligible'] is not True or not row['reviewer'].strip() or not row['notes'].strip():
         raise ValueError('record the source eligibility decision and reviewer notes before binding')
-    outlines = row['frame0_handle_polygons']
+    polygon_field = ('frame0_lid_polygons' if protocol['story'] == CANISTER_STORY
+                     else 'frame0_handle_polygons')
+    outlines = row[polygon_field]
     if set(outlines) != set(TARGETS):
-        raise ValueError('provide first-frame handle polygons for S1 and S3 only')
+        raise ValueError('provide first-frame target-part polygons for S1 and S3 only')
     regions = {}
     hashes = {shot: entry['sha256'] for shot, entry in assets.items()}
     for shot in TARGETS:
@@ -114,16 +119,23 @@ def blind(run, output, key):
     source_dir.mkdir()
     for shot, path in source_files.items():
         remux(path, source_dir / f'{shot}.mp4')
+    temporal_review = protocol['story'] == CANISTER_STORY
     mapping = {}
     for index, (policy, shot, path) in enumerate(items, 1):
         name = f'R{index:02d}'
         remux(path, output / f'{name}-{shot}.mp4')
         mapping[name] = dict(policy=policy, shot=shot, sha256=checksum(path))
+        if temporal_review:
+            mapping[name]['decoded_sha256'] = subprocess.check_output(
+                ['ffmpeg', '-nostdin', '-v', 'error', '-threads', '1', '-i', str(path),
+                 '-map', '0:v:0', '-pix_fmt', 'rgb24', '-threads', '1', '-f', 'hash',
+                 '-hash', 'sha256', '-'], text=True, timeout=90).strip().removeprefix('SHA256=')
     write_json(key, mapping)
     with (output / 'ratings.csv').open('x', newline='', encoding='utf-8') as stream:
         writer = csv.writer(stream)
-        writer.writerow(FIELDS)
-        writer.writerows((name, '', '', '') for name in mapping)
+        fields = (*FIELDS, 'temporal') if temporal_review else FIELDS
+        writer.writerow(fields)
+        writer.writerows((name, *([''] * (len(fields) - 1))) for name in mapping)
     (output / 'REVIEW.md').write_text(
         'Score all clips in numeric order against the same-shot source. '
         'Keep your ratings independent.\n\n'
@@ -138,7 +150,7 @@ def remux(source, output):
 
 
 def scores(run, key, ratings):
-    check_protocol(run)
+    temporal_review = check_protocol(run)['story'] == CANISTER_STORY
     mapping = load(key)
     report = load(run / 'report.json')
     expected = {(policy, shot) for policy in POLICIES for shot in SHOTS}
@@ -161,12 +173,14 @@ def scores(run, key, ratings):
                                      if repair['child'] == 'S3'), None),
             publication_seconds_after_edit=row['publication_seconds_after_edit'], reviews=[],
         )
+    conflicts = []
     for path in ratings:
         with path.open(newline='', encoding='utf-8-sig') as stream:
             review = list(csv.DictReader(stream))
         if len(review) != len(mapping) or {row['clip'] for row in review} != set(mapping):
             raise ValueError(f'{path}: expected one rating per clip')
         by_policy = {policy: {} for policy in POLICIES}
+        identical = defaultdict(list)
         for row in review:
             entry = mapping[row['clip']]
             shot = entry['shot']
@@ -174,10 +188,19 @@ def scores(run, key, ratings):
             allowed = ('pass', 'fail', 'uncertain') if shot in TARGETS else ('na',)
             if edit not in allowed or row['unintended'] not in ('yes', 'no', 'uncertain'):
                 raise ValueError(f"{path}: invalid rating for {row['clip']}")
-            if ((edit in ('fail', 'uncertain') or row['unintended'] != 'no')
+            temporal = row.get('temporal') if temporal_review else None
+            if temporal_review and temporal not in allowed:
+                raise ValueError(f"{path}: invalid temporal rating for {row['clip']}")
+            if ((edit in ('fail', 'uncertain') or row['unintended'] != 'no'
+                 or temporal in ('fail', 'uncertain'))
                     and not row['timestamps_and_notes'].strip()):
                 raise ValueError(f"{path}: missing evidence notes for {row['clip']}")
             by_policy[entry['policy']][shot] = row
+            if temporal_review:
+                identical[shot, entry['decoded_sha256']].append(row)
+        for group in identical.values():
+            if len({(r['edit'], r['unintended'], r['temporal']) for r in group}) > 1:
+                conflicts.append(dict(reviewer_file=path.name, ratings=group))
         for policy, shots in by_policy.items():
             result[policy]['reviews'].append(dict(
                 reviewer_file=path.name,
@@ -188,6 +211,9 @@ def scores(run, key, ratings):
                 changed_target=[shot for shot in TARGETS if shots[shot]['unintended'] == 'yes'],
                 shots=shots,
             ))
+            if temporal_review:
+                result[policy]['reviews'][-1]['temporal_pass_target'] = [
+                    shot for shot in TARGETS if shots[shot]['temporal'] == 'pass']
     worklist = result['worklist']['reviews']
     egdr = result['online_egdr']['reviews']
     paired = [
@@ -196,8 +222,10 @@ def scores(run, key, ratings):
              s3_edit_worklist=left['shots']['S3']['edit'], s3_edit_egdr=right['shots']['S3']['edit'])
         for left, right in zip(worklist, egdr)
     ]
-    print(json.dumps(dict(policies=result, paired_vlm_minus_worklist=paired),
-                     indent=2, ensure_ascii=False))
+    summary = dict(policies=result, paired_vlm_minus_worklist=paired)
+    if temporal_review:
+        summary['identical_video_rating_conflicts'] = conflicts
+    print(json.dumps(summary, indent=2, ensure_ascii=False))
 
 
 def main():
