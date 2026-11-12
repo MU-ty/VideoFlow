@@ -278,7 +278,8 @@ def make_conditioned_reference(clip, output, shot, expected, outline, region_nam
                 changed_pixels=changed, file=output.name, **{region_name: outline})
 
 
-def prepare_conditioned_builder(root, source, backend, regions, story, *, reference_frames=None):
+def prepare_conditioned_builder(root, source, backend, regions, story, *, reference_frames=None,
+                                target_prompt=None):
     from recovery_reference_comfy import check_backend, upload_frame
     from run_egdr_reference_pair import condition
 
@@ -311,7 +312,13 @@ def prepare_conditioned_builder(root, source, backend, regions, story, *, refere
         scene, separator, _ = prompt.partition(' Apply the following appearance instruction')
         if not separator:
             raise ValueError('missing appearance slot')
-        if lamp:
+        if target_prompt is not None:
+            old_part, new_part, preserve = target_prompt
+            if old_part not in scene:
+                raise ValueError('missing original part in conditioned prompt')
+            scene = (scene.replace(old_part, new_part)
+                     + f' Keep the {new_part} red throughout. Preserve {preserve}.')
+        elif lamp:
             scene = (scene.replace('solid silver metal dome shade', 'scarlet red metal dome shade')
                      + ' Keep the shade scarlet red from the first visible frame through the end. '
                        'Preserve the cream base, black hexagon, desk, and background.')
@@ -372,7 +379,7 @@ def submit_anchor(folder, runtime, backend, epoch, build=build_h3):
         raise RuntimeError(f'S1 epoch {epoch} did not reach the acknowledgement barrier')
 
 
-def source_probes(root, sheets, case, question, args, log):
+def source_probes(root, sheets, case, question, args, log, *, capture=capture_probe):
     probes = {}
     for shot, sheet in sheets.items():
         if shot in case['declared']:
@@ -382,7 +389,7 @@ def source_probes(root, sheets, case, question, args, log):
             tile = root / f'{shot}-panel-{i}.png'
             ffmpeg('-i', sheet, '-vf', f'crop=768:432:{x}:{y}', '-frames:v', 1, '-threads', 1, tile)
             panels.append(tile)
-        probes[shot] = capture_probe(args.ollama, args.vision_model, question, panels, root / f'probe-{shot}', log)
+        probes[shot] = capture(args.ollama, args.vision_model, question, panels, root / f'probe-{shot}', log)
     return probes
 
 
@@ -404,7 +411,7 @@ def bind_oracle(labels, source, case):
     }
 
 
-def run(args):
+def run(args, *, probe_capture=capture_probe, target_prompt=None, protocol_extras=None):
     backend = ComfyUI(args.server)
     queue = backend._request('/queue')
     if any(queue.get(key) for key in ('queue_running', 'queue_pending')):
@@ -427,6 +434,7 @@ def run(args):
         'oracle_labels_sha256': checksum(args.oracle_labels) if args.oracle_labels else None,
     }
                        if args.story in radio.HOLDOUTS else {})
+    protocol_fields.update(protocol_extras or {})
     if args.lunchbox_later_reference:
         protocol_fields.update(analysis_scope=LUNCHBOX_DIAGNOSTIC_SCOPE,
                                original_source_eligible=False,
@@ -490,13 +498,13 @@ def run(args):
             if set(regions) != set(radio.TARGETS):
                 raise ValueError('expected the two preregistered conditioned target shots')
         final_builder = (prepare_conditioned_builder(
-            args.output, source, backend, regions, args.story, reference_frames=reference_frames)
-                         if regions else build_h3)
+            args.output, source, backend, regions, args.story, reference_frames=reference_frames,
+            target_prompt=target_prompt) if regions else build_h3)
         raw = []
         started = time.monotonic()
         if args.continuous:
             with (args.output / 'responses.jsonl').open('x', encoding='utf-8') as responses:
-                probes = (source_probes(args.output, sheets, case, question, args, responses)
+                probes = (source_probes(args.output, sheets, case, question, args, responses, capture=probe_capture)
                           if 'online_egdr' in args.policies else {})
                 responses.flush()
             raw = [json.loads(line) for line in (args.output / 'responses.jsonl').read_text().splitlines()]
@@ -631,7 +639,13 @@ def run(args):
                     if set(bindings) != final_selection.intersection(references):
                         raise RuntimeError('conditioned final renders disagree with the committed plan')
                     row['reference_bindings'] = bindings
-                if args.story == radio.CANISTER_STORY:
+                if protocol_extras:
+                    observed = {job['external_id']: job['accepted_observed_at']
+                                for job in jobs if job['external_id'] and job['accepted_observed_at'] is not None}
+                    row['edit_phase_observed_acceptances'] = len(observed)
+                    row['post_final_edit_observed_acceptances'] = sum(
+                        stamp >= edited_at for stamp in observed.values())
+                if args.story == radio.CANISTER_STORY or protocol_extras:
                     uses_vlm = policy == 'online_egdr'
                     row['vlm_calls'] = sum(p['calls'] for p in probes.values()) if uses_vlm else 0
                     row['vlm_wall_seconds'] = evidence_seconds if uses_vlm else 0
@@ -642,6 +656,17 @@ def run(args):
                 runtime.close()
         report = dict(evidence='real_H3_unreviewed_quality',
                       source_timeline_hash=before['timeline_hash'], rows=rows)
+        if protocol_extras:
+            report.update(protocol_extras)
+            declared = set(case['declared'])
+            report['candidate_selections'] = {
+                'legacy': sorted(declared | {shot for shot, probe in probes.items()
+                                             if probe['baseline_decision'] != 'no'}),
+                'structured_strict_location': sorted(declared | {
+                    shot for shot, probe in probes.items()
+                    if probe['baseline_decision'] != 'no'
+                    and probe.get('structured_strict') != 'rejected'}),
+            }
         if args.story == radio.CANISTER_STORY:
             report.update(analysis_scope='prespecified_single_story',
                           reference_frame_indices=dict.fromkeys(radio.TARGETS, 0))
