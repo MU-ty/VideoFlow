@@ -1,0 +1,56 @@
+% Insert the first subsection in Section III and the second in Section IV.
+% Draft text. Report held-out outcomes only after the experiment is run.
+\subsection{Revision-scoped Dependency Repair}
+Let \(G^0=(V,E_s^0,E_r,E_o)\) be the authored graph and
+\(d_r=(u,k,v)\) the edit at revision \(r\), with anchor shot \(u\),
+edited attribute key \(k\), and new value \(v\). A candidate
+\(c=(r,u,w,k,h_w)\) binds a downstream shot \(w\) to the input digest
+\(h_w\) from the last published revision. We consider only forward
+state edges to shots with a compatible declared attribute binding.
+For each candidate we record a verdict in
+\(\{\mathrm{Confirmed},\mathrm{Rejected},\mathrm{Unknown}\}\)
+together with evidence-frame digests. Confirmed candidates contribute
+keyed state edges \((u,w,k)\) to the effective graph of revision \(r\).
+Rejected candidates contribute no edge. Authored edges remain in force.
+A conservative fallback may schedule work for an Unknown candidate
+without recording its identity as Confirmed.
+
+\subsection{Evidence Acquisition and Revision-Safe Execution}
+For each sampled frame, the identity probe records host and part visibility,
+marker shape, color, location, and the same-instance relation. The prompt
+asks for observations about the host and part. The decision rule compares
+these fields with a prespecified marker ontology. A visible part linked to
+a matching host marker confirms the candidate. Rejection requires at least
+one explicitly excluded identity, complete coverage of the designated
+frames, and no unresolved frame or confirmed target. Missing visibility,
+uncertain ownership, and malformed evidence remain Unknown. This rule
+limits exclusion to the evidence supplied by the designated frames.
+
+Let \(Q_r\) be the shots included by an explicit conservative fallback,
+and let \(G_r\) denote the effective graph with confirmed repairs.
+The regeneration set is the DAIR closure from
+\(\{u\}\cup Q_r\) under the edited key on \(G_r\). With the current
+runtime, each accepted repair propagates from the newly affected child
+over the authored graph. This is sufficient for the supported
+anchor-to-child repairs. Under a traversal of the applicable edges, one
+closure evaluation costs \(O(|V|+|E_r^{\mathrm{eff}}|)\), where
+\(E_r^{\mathrm{eff}}\) denotes all effective edges at revision \(r\).
+Processing \(m\) candidates incrementally can require up to \(m\)
+such traversals, in addition to at most \(Bm\) model calls at budget
+\(B\) per candidate. The prototype uses two ordered pairs of frames
+and stops early on positive linked evidence.
+
+The runtime accepts a resolution only for the current revision and its
+pinned input digest. Publication waits for all pinned candidates to be
+resolved or given an explicit fallback, and for the required current
+outputs to commit. This protects revision consistency. The shot-selection
+guarantee is conditional on the correctness and coverage of the supplied
+evidence.
+
+For a future cost-sensitive policy, one may compare reuse, regeneration,
+and acquisition of another frame using
+\(J(a)=\lambda_1 C_{\mathrm{render}}(a)+\lambda_2R_{\mathrm{miss}}(a)
++\lambda_3R_{\mathrm{false}}(a)+\lambda_4C_{\mathrm{evidence}}(a)\).
+Estimating those risks requires disjoint calibration data. The present
+structured probe evaluates a fixed evidence budget and preserves Unknown
+candidates for conservative fallback.
