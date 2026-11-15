@@ -1,0 +1,151 @@
+{
+  "model": "qwen2.5vl:7b-ctx8k",
+  "options": {
+    "temperature": 0,
+    "seed": 42,
+    "num_predict": 384
+  },
+  "direct_prompt": "Judge the left panel (1) and right panel (2) independently. Host: a light gray tabletop fan with a round grille and a broad rectangular base. Edited part: large silver speed dial on the front of the base. The target identity has one large solid yellow circle printed immediately to the left of the dial on the base. The excluded identity has one large solid yellow triangle printed immediately to the left of the dial on the base. Both identities require the mark and visible edited part on the same instance. Use target for a clear match, excluded only when the panel is readable and no unexamined host could be present, absent_host when there is clearly no host, and unknown for obscured, incomplete or ambiguous evidence. Return two panel records.",
+  "structured_prompt": "Describe two video frames independently, left panel 1 and right panel 2. Inspect the host object for an identity mark printed or painted on it. The color or shape of the edited part itself is not an identity mark. Record host_visible and part_visible independently. Record mark shape, color, and location on the host, and whether the mark belongs to the same instance as the edited part. Do not guess hidden colors or shapes. Use unknown for each unreadable field. Set complete=true only if the panel is readable and you can rule out an unexamined host instance. If more than one host instance is visible, set complete=false and same_instance=unknown. Return two panel records only. Edited part to locate: large silver speed dial on the front of the base. Host type: a light gray tabletop fan with a round grille and a broad rectangular base. Use body for the main housing, including its neck. Keep the marker on the same host as the part.",
+  "direct_schema": {
+    "type": "object",
+    "required": [
+      "panels"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "panels": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "object",
+          "required": [
+            "panel",
+            "verdict"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "panel": {
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "verdict": {
+              "enum": [
+                "target",
+                "excluded",
+                "absent_host",
+                "unknown"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "structured_schema": {
+    "type": "object",
+    "properties": {
+      "panels": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "object",
+          "properties": {
+            "panel": {
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "host_visible": {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ]
+            },
+            "part_visible": {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ]
+            },
+            "same_instance": {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ]
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "shape": {
+              "enum": [
+                "circle",
+                "triangle",
+                "diamond",
+                "star",
+                "hexagon",
+                "rectangle",
+                "stripe",
+                "other",
+                "unknown"
+              ]
+            },
+            "color": {
+              "enum": [
+                "white",
+                "black",
+                "red",
+                "orange",
+                "yellow",
+                "blue",
+                "green",
+                "purple",
+                "silver",
+                "other",
+                "unknown"
+              ]
+            },
+            "location": {
+              "enum": [
+                "body",
+                "base",
+                "handle",
+                "lid",
+                "shade",
+                "other",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "panel",
+            "host_visible",
+            "part_visible",
+            "same_instance",
+            "complete",
+            "shape",
+            "color",
+            "location"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "panels"
+    ],
+    "additionalProperties": false
+  },
+  "version": {
+    "version": "0.40.14"
+  },
+  "model_digest": "9304a775f2a97356548183530c45c96ee2a11b8e6bb7c1a9e46b791472a1af8d"
+}

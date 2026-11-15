@@ -1,0 +1,52 @@
+{
+  "teapot-chain": {
+    "seeds": [
+      92023
+    ],
+    "host": "a cream ceramic teapot on a low studio tabletop",
+    "part": "small {{target.color}} lid knob",
+    "initial": "matte black",
+    "target_marker": "orange star",
+    "distractor_marker": "orange diamond",
+    "edges": [
+      [
+        "S3",
+        "S4"
+      ],
+      [
+        "S4",
+        "S6"
+      ]
+    ],
+    "reference_motion": {
+      "S4": "Slowly zoom in toward the lid knob while maintaining the same pot, orange star, and knob color.",
+      "S6": "Continue the close-up with a gentle rightward slide. Preserve the same pot, orange star, and knob color."
+    },
+    "independent": "A closed green book beside a ruler on an empty tabletop. No teapot."
+  },
+  "toolbox-fanout": {
+    "seeds": [
+      92033
+    ],
+    "host": "a light gray metal toolbox on a low studio tabletop",
+    "part": "large {{target.color}} front latch",
+    "initial": "matte black",
+    "target_marker": "yellow circle",
+    "distractor_marker": "yellow triangle",
+    "edges": [
+      [
+        "S3",
+        "S4"
+      ],
+      [
+        "S3",
+        "S6"
+      ]
+    ],
+    "reference_motion": {
+      "S4": "Slowly move closer to the latch while maintaining the same toolbox, yellow circle, and latch color.",
+      "S6": "Hold a frontal view with a slight leftward slide. Preserve the same toolbox, yellow circle, and latch color."
+    },
+    "independent": "A white mug beside a paper pencil on an empty tabletop. No toolbox."
+  }
+}
