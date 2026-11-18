@@ -4,6 +4,7 @@ from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
+from uuid import uuid4
 from zipfile import ZipFile
 
 from audit_gap_adjudication import audit
@@ -70,9 +71,14 @@ def main():
     parser.add_argument('--timeout', type=float, default=2400)
     parser.add_argument('--poll', type=float, default=2)
     parser.add_argument('--validate-only', action='store_true')
+    parser.add_argument('--resume', action='store_true', help='continue an existing output directory')
+    parser.add_argument('--retry-unfinished', action='store_true',
+                        help='archive the unfinished arm and start a new attempt')
     args = parser.parse_args()
     if args.timeout <= 0 or args.poll <= 0:
         parser.error('timeout and poll must be positive')
+    if args.retry_unfinished and not args.resume:
+        parser.error('--retry-unfinished requires --resume')
     args.server = args.server.rstrip('/')
     api = runner.live_setup(runner.ROOT / 'runtime')
     runs = list(load_runs(args.source, args.replay, api))
@@ -80,7 +86,6 @@ def main():
     if args.validate_only:
         return
 
-    args.output.mkdir(parents=True)
     write = api['write_json']
     backend = api['ComfyUI'](args.server)
     report = {
@@ -92,23 +97,53 @@ def main():
         'seeds': {name: {'status': 'pending', 'arms': {}} for name, *_ in runs},
     }
     report_path = args.output / 'report.json'
+    if args.resume:
+        previous = runner.load_json(report_path)
+        if any(previous[key] != report[key] for key in (
+                'replay_archive_sha256', 'rule', 'replay_round', 'evidence_timing'
+        )) or set(previous['seeds']) != set(report['seeds']):
+            raise ValueError('existing report belongs to a different experiment')
+        report = previous
+        report['status'] = 'running'
+    else:
+        args.output.mkdir(parents=True)
     write(report_path, report)
     for index, (name, database, case, manifest, evidence) in enumerate(runs):
         result = report['seeds'][name]
         root = args.output / name
-        root.mkdir()
+        root.mkdir(exist_ok=args.resume)
         order = ARMS if index % 2 == 0 else ARMS[::-1]
         try:
             for arm in order:
+                if result['arms'].get(arm, {}).get('status') == 'completed':
+                    continue
                 print(f'{name} {arm}', flush=True)
-                api['check_backend'](backend)
-                refs = api['ReferenceFrames'](root / (arm + '-references'), backend)
+                arm_root = root / arm
+                arm_resume = args.resume and arm_root.is_dir()
+                if arm_resume and args.retry_unfinished:
+                    api['check_backend'](backend)
+                    retry_archive = arm_root.with_name(f'{arm}-incomplete-{uuid4().hex}')
+                    arm_root.rename(retry_archive)
+                    result.setdefault('archived_attempts', {}).setdefault(arm, []).append(
+                        retry_archive.relative_to(args.output).as_posix())
+                    write(report_path, report)
+                    arm_resume = False
+                if not arm_resume:
+                    api['check_backend'](backend)
+                ref_root = root / (arm + '-references')
+                if ref_root.exists():
+                    ref_root = ref_root.with_name(f'{ref_root.name}-{uuid4().hex}')
+                refs = api['ReferenceFrames'](ref_root, backend)
                 result['arms'][arm] = runner.run_policy(
-                    args, api, root / arm, database, manifest, case, None, refs, backend, 'egdr',
-                    frozen_evidence=evidence[arm])
+                    args, api, arm_root, database, manifest, case, None, refs, backend, 'egdr',
+                    frozen_evidence=evidence[arm], resume=arm_resume)
                 result['arms'][arm]['policy'] = arm
+                attempts = result.get('archived_attempts', {}).get(arm)
+                if attempts:
+                    result['arms'][arm]['retry_of'] = attempts[-1]
                 write(report_path, report)
             result['status'] = 'completed'
+            result.pop('error', None)
         except Exception as exc:
             result.update(status='failed', error=str(exc))
             report['status'] = 'failed'
