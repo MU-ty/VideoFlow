@@ -251,8 +251,10 @@ def dependency_result(shots):
 
 
 def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, backend, policy,
-               *, frozen_evidence=None):
-    root.mkdir()
+               *, frozen_evidence=None, resume=False):
+    if resume and frozen_evidence is None:
+        raise ValueError('resume requires frozen evidence')
+    root.mkdir(exist_ok=resume)
     journal = root / 'events.jsonl'
     write = api['write_json']
     visual = policy in VISUAL_POLICIES
@@ -288,10 +290,16 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
             self.last_inspection = backend.last_inspection
             return result
 
-    with closing(sqlite3.connect(seed_db)) as source_db, closing(sqlite3.connect(root / 'project.db')) as dest_db:
-        source_db.backup(dest_db)
-    with closing(Runtime(root / 'project.db')) as runtime:
-        initial = {row['asset']: row for row in runtime.snapshot()['timeline']}
+    database = root / 'project.db'
+    if not resume or not database.is_file():
+        check(not journal.exists(), 'cannot restart an arm with a journal but no database')
+        with closing(sqlite3.connect(seed_db)) as source_db, closing(sqlite3.connect(database)) as dest_db:
+            source_db.backup(dest_db)
+    with closing(Runtime(database)) as runtime:
+        source = runtime.db.execute('SELECT entries FROM vf_timelines WHERE revision=1').fetchone()
+        check(source is not None and api['fingerprint'](json.loads(source[0])) ==
+              source_archive['timeline_hash'], 'arm database does not match archived Rev.1')
+        initial = {row['asset']: row for row in json.loads(source[0])}
         event = dict(id='edit-2', expected_revision=1, target='S1', key=KEY,
                      value='scarlet red', method=method)
         if visual:
@@ -319,8 +327,15 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
         with ThreadPoolExecutor(max_workers=1) as pool:
             deadline = time.monotonic() + args.timeout
             edit_at = time.time()
+            prior_edit = runtime.db.execute(
+                'SELECT applied_at FROM vf_events WHERE id=?', (event['id'],)).fetchone()
             plan = runtime.edit(event)
-            log(journal, 'edit', revision=2, plan=plan)
+            if prior_edit is None:
+                log(journal, 'edit', revision=2, plan=plan)
+            else:
+                check(resume, 'arm already contains an edit')
+                edit_at = prior_edit[0]
+                log(journal, 'resume', revision=2)
             future = pool.submit(observe) if visual and frozen_evidence is None else None
             evidence = frozen_evidence
             evidence_applied = None
@@ -330,6 +345,9 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
                 evidence_applied = apply_evidence(evidence, records)
             transport = Transport()
             while time.monotonic() < deadline:
+                if runtime.snapshot()['timeline']:
+                    check(not visual or evidence is not None, 'published before resolving evidence')
+                    break
                 if future is not None and future.done() and evidence is None:
                     evidence = future.result()
                     records = load_json(root / 'frozen/index.json')
@@ -342,7 +360,9 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
                     break
                 time.sleep(args.poll)
             else:
-                raise TimeoutError('edit reached the publication deadline')
+                jobs = [dict(shot=j['asset'], status=j['status'], prompt_id=j['external_id'],
+                             error=j['error']) for j in runtime.snapshot()['jobs'] if j['revision'] == 2]
+                raise TimeoutError(f'edit reached the publication deadline; Rev.2 jobs: {jobs}')
 
         published_at = runtime.db.execute(
             'SELECT published_at FROM vf_timelines WHERE revision=2').fetchone()[0]
@@ -358,6 +378,7 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
         lineage = api['reference_evidence']([final], jobs, refs, case['edges'])
         events = [json.loads(line) for line in journal.read_text().splitlines()]
         return dict(policy=policy, status='completed', expected=sorted(expected),
+                    resumed_after_edit=prior_edit is not None,
                     dependency_discovery=dependency_result(evidence['shots']) if evidence else None,
                     first_publication=dict(revision=2, regenerated=sorted(regenerated),
                         missing_targets=sorted(expected - regenerated),
@@ -369,7 +390,8 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
                     initial_plan=plan['regenerate'],
                     evidence_acquisition_s=(evidence['finished_s'] - evidence['started_with_frame_extraction_s']
                                             if evidence and frozen_evidence is None else None),
-                    edit_to_evidence_applied_s=evidence_applied - edit_at if evidence else None,
+                    edit_to_evidence_applied_s=(evidence_applied - edit_at
+                                                if evidence and prior_edit is None else None),
                     vlm_calls=sum(len(item['calls']) for item in evidence['shots'].values()) if evidence else 0,
                     vlm_parse_failures=sum(item['parse_failures'] for item in evidence['shots'].values()) if evidence else 0,
                     vlm_request_failures=sum(item['request_failures'] for item in evidence['shots'].values()) if evidence else 0,
