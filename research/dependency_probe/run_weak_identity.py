@@ -97,12 +97,25 @@ def oracle_evidence():
                            ('S2', 'distinct', 'rejected'), ('S3', 'match', 'confirmed'))})
 
 
-def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, backend, policy):
+def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, backend, policy,
+               *, observer=None):
     root.mkdir()
     journal = root / 'events.jsonl'
     write = api['write_json']
     gated = policy != 'declared-worklist'
     method = 'dair' if gated else 'attr_dag'
+    visual = policy == 'egdr-fixed' or observer is not None
+
+    class Runtime(api['AssetRuntime']):
+        @staticmethod
+        def _plan(assets, specs, edges, event):
+            plan = api['AssetRuntime']._plan(assets, specs, edges, event)
+            if policy == 'direct-worklist':
+                worklist = api['AssetRuntime']._plan(assets, specs, edges,
+                                                     dict(event, method='attr_dag'))
+                check(worklist.regenerate == plan.regenerate, 'paired closure mismatch')
+                return worklist
+            return plan
 
     class Transport:
         base = backend.base
@@ -119,7 +132,7 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
 
     with closing(sqlite3.connect(seed_db)) as source_db, closing(sqlite3.connect(root / 'project.db')) as dest_db:
         source_db.backup(dest_db)
-    with closing(api['AssetRuntime'](root / 'project.db')) as runtime:
+    with closing(Runtime(root / 'project.db')) as runtime:
         source_timeline = runtime.snapshot()['timeline']
         check(source_timeline and api['fingerprint'](source_timeline) == source_archive['timeline_hash'],
               'arm database does not match archived Rev.1')
@@ -133,8 +146,12 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
             started = time.monotonic()
             frozen = root / 'frozen'
             stage_inputs(api, frozen, source_archive, root.parent / 'source_media')
-            evidence = acquire(args, dict(api, image_reply=fixed_image_reply(api, case, verifier)),
-                               frozen, verifier, case, 2, root / 'vlm.jsonl', 'egdr')
+            if observer is None:
+                evidence = acquire(args, dict(api, image_reply=fixed_image_reply(api, case, verifier)),
+                                   frozen, verifier, case, 2, root / 'vlm.jsonl', 'egdr')
+            else:
+                evidence = observer(args, api, frozen, verifier, case, 2,
+                                    root / 'vlm.jsonl', policy)
             evidence['started_with_frame_extraction_s'] = started
             return evidence
 
@@ -143,7 +160,7 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
             edit_at = time.time()
             plan = runtime.edit(event)
             log(journal, 'edit', revision=2, plan=plan)
-            future = pool.submit(observe) if policy == 'egdr-fixed' else None
+            future = pool.submit(observe) if visual else None
             evidence = None
             evidence_applied = None
             transport = Transport()
@@ -154,7 +171,7 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
                     evidence = future.result()
                 if evidence is not None and evidence_applied is None:
                     write(root / 'evidence.json', evidence)
-                    if policy == 'egdr-fixed':
+                    if visual:
                         records = load_json(root / 'frozen/index.json')
                     else:
                         records = {row['asset']: {'clip_sha256': row['sha256']}
@@ -202,7 +219,7 @@ def run_policy(args, api, root, seed_db, source_archive, case, verifier, refs, b
                         edit_to_publish_s=published_at - edit_at),
                     initial_plan=plan['regenerate'],
                     evidence_acquisition_s=(evidence['finished_s'] - evidence['started_with_frame_extraction_s']
-                                            if policy == 'egdr-fixed' else None),
+                                            if visual else None),
                     edit_to_evidence_applied_s=evidence_applied - edit_at if evidence else None,
                     vlm_calls=sum(len(item['calls']) for item in evidence['shots'].values()) if evidence else 0,
                     vlm_parse_failures=sum(item['parse_failures'] for item in evidence['shots'].values()) if evidence else 0,
@@ -265,7 +282,7 @@ def stage_sources(args, api, cases, backend):
     write_screen_template(args.output / 'source-screen.csv', rows)
 
 
-def read_screen(path, source_report, cases):
+def read_screen(path, source_report, cases, *, require_ambiguity=True):
     items = {}
     with path.open(newline='', encoding='utf-8-sig') as file:
         reader = csv.DictReader(file)
@@ -296,7 +313,7 @@ def read_screen(path, source_report, cases):
         shots = {shot: items[block, shot] for shot in ('S1', *CANDIDATES)}
         readable = all(row['panels'] >= 1 and row['part_visible'] == 'yes' for row in shots.values())
         weak = any(shots[shot]['panels'] < 4 for shot in CANDIDATES)
-        reason = None if readable and weak else ('insufficient readable evidence' if not readable
+        reason = None if readable and (weak or not require_ambiguity) else ('insufficient readable evidence' if not readable
                                                  else 'no ambiguous candidate panel')
         decisions[block] = dict(status='eligible' if reason is None else 'excluded',
                                 reason=reason, screening=shots)
