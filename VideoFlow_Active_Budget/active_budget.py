@@ -128,7 +128,9 @@ def replay(case, bank, policy, budget, order):
 def score(cases, banks, budgets):
     rows = {}
     for index, (block, bank) in enumerate(sorted(banks.items())):
-        order = sorted(bank, reverse=bool(index % 2))
+        order = cases[block].get('recheck_order', sorted(bank, reverse=bool(index % 2)))
+        if len(order) != len(bank) or set(order) != set(bank):
+            raise ValueError(f'invalid recheck order: {block}')
         rows[block] = {budget: {policy: replay(cases[block], bank, policy, budget, order)
                                for policy in POLICIES}
                        for budget in budgets}
