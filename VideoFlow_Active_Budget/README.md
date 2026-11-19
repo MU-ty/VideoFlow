@@ -87,3 +87,50 @@ The collection can resume in the same output directory with the same
 protocol, source, screen, and model identity. Invalid replies and request
 failures consume their assigned budget and are recorded as unknown evidence.
 Inspect paired records and source eligibility before interpreting the totals.
+
+## Position-balanced follow-up
+
+The paired relabeling check uses the archived 926 responses. It swaps S2/S3
+response banks, oracle labels and graph endpoints while keeping the
+position-based tie order fixed. The two assignments share each source seed
+and count as a single independent pair. No new model calls are made.
+
+```bash
+python3 VideoFlow_Active_Budget/replay_positions.py \
+  --archive egdr-active-holdout-926.zip \
+  --protocol VideoFlow_Active_Budget/fresh_926_protocol.json \
+  --output runs/egdr-position-replay-926.json
+```
+
+At budget 3 on the five eligible pairs, uncertainty and graph-aware
+verification each found the exact set on 8/10 assignments. Fixed rotation
+and the two fixed first-shot controls each found 4/10. All kept every target.
+When the comparison budget was 4, the three fixed controls also found 8/10.
+The relabeling check compares selection under two ID assignments to the
+same observations.
+
+The 927 holdout freezes eight fresh generation seeds across the same four
+stories. Each story places its target once in S2 and once in S3. Across
+stories, each combination of target position and downstream parent
+position occurs twice, with both tie orders. The protocol sets tie order
+before screening and keeps it when reporting the eligible subset. Report
+target positions and downstream parent positions among eligible seeds as
+well as the total counts. The primary budget is 3 calls per case.
+
+```bash
+src="runs/egdr-active-source-927"
+python3 -u VideoFlow_Active_Budget/generate_sources.py \
+  --protocol VideoFlow_Active_Budget/balanced_927_protocol.json --output "$src"
+```
+
+For this protocol, S1 and the candidate listed in `expected` use the target
+marker. The other candidate uses the distractor marker. Screen contact
+sheets and fill the generated CSV before collecting replies, as above.
+
+```bash
+src="runs/egdr-active-source-927"
+python3 -u VideoFlow_Active_Budget/active_budget.py \
+  --source-run "$src" --screen "$src/source-screen.csv" \
+  --protocol VideoFlow_Active_Budget/balanced_927_protocol.json \
+  --output runs/egdr-active-holdout-927
+```
