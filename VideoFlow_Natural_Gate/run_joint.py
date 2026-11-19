@@ -200,7 +200,8 @@ def generated_manifest(case):
     for i, shot in enumerate(('S1', 'S2', 'S3', 'S4', 'S5', 'S6')):
         values = {}
         if shot in ('S1', 'S2', 'S3'):
-            marker = case['distractor_marker'] if shot == 'S2' else case['target_marker']
+            edited = shot == 'S1' or shot in case.get('expected', ('S3',))
+            marker = case['target_marker'] if edited else case['distractor_marker']
             angle = 'Front three-quarter view' if shot != 'S3' else 'Tight side three-quarter view'
             prompt = (f"{angle} of {case['host']} with a {case['part']}. "
                       f"Clearly show one large solid {marker} sticker fixed to the front body "
