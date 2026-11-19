@@ -10,6 +10,7 @@ import time
 from run_joint import CANDIDATES, KEY, ROOT, STORIES, acquire, check, load_json, log, run_seed
 
 POLICIES = ('ungated-worklist', 'gated-worklist')
+SAFE_POLICIES = ('gated-worklist', 'evidence-first-worklist')
 
 
 def edit_anchor(runtime, *, track_candidates):
@@ -49,9 +50,16 @@ def run_arm(args, api, root, seed_db, frozen, case, verifier, refs, backend, pol
     root.mkdir()
     journal = root / 'events.jsonl'
     shared_path = root.parent / 'natural_evidence.json'
+    write = api['write_json']
+    if args.compare_evidence_first and not shared_path.exists():
+        started = time.monotonic()
+        evidence = acquire(args, api, frozen, verifier, case, 2, root.parent / 'natural_vlm.jsonl')
+        write(shared_path, dict(evidence=evidence, arrival_s=evidence['finished_s'] - started,
+                                acquired_in='before-timed-arms'))
     live = not shared_path.exists()
     shared = None if live else load_json(shared_path)
-    gated = policy == 'gated-worklist'
+    gated = policy != 'ungated-worklist'
+    evidence_first = policy == 'evidence-first-worklist'
 
     class Runtime(api['AssetRuntime']):
         @staticmethod
@@ -91,7 +99,6 @@ def run_arm(args, api, root, seed_db, frozen, case, verifier, refs, backend, pol
             prime_journal = root / 'cache-prime-events.jsonl'
             prime_job = prime_anchor_cache(args, api, prime_db, Transport(prime_journal),
                                            refs, prime_journal)
-    write = api['write_json']
     with closing(Runtime(db)) as runtime, ThreadPoolExecutor(max_workers=1) as pool:
         initial = {row['asset']: row for row in runtime.snapshot()['timeline']}
         frame_index = load_json(frozen / 'index.json')
@@ -126,7 +133,8 @@ def run_arm(args, api, root, seed_db, frozen, case, verifier, refs, backend, pol
                     applied_wall = time.time()
 
             events = api['pass_once'](runtime, transport, build=refs.build, max_submit=0)
-            free = max(0, 2 - len(runtime.unresolved_remote()))
+            free = (0 if evidence_first and applied_wall is None
+                    else max(0, 2 - len(runtime.unresolved_remote())))
             for job in runtime.pending()[:free]:
                 for dep in runtime._inputs(job['asset'])['dependencies']:
                     if dep['kind'] == 'reference':
@@ -170,10 +178,15 @@ def run_arm(args, api, root, seed_db, frozen, case, verifier, refs, backend, pol
         missing = sorted(expected - regenerated)
         check(not gated or published_at >= start_wall + shared['arrival_s'],
               'gated arm published before recorded evidence arrival')
+        submitted_at = anchor['accepted_observed_at']
+        if evidence_first:
+            check(submitted_at is not None and submitted_at >= applied_wall,
+                  'evidence-first anchor accepted before evidence application finished')
         report = dict(policy=policy, evidence_origin='live' if live else 'timed-replay',
                       shared_evidence_sha256=api['checksum'](shared_path),
                       evidence_arrival_s=shared['arrival_s'],
                       anchor_commit_s=anchor_at-start_wall,
+                      anchor_acceptance_s=None if submitted_at is None else submitted_at-start_wall,
                       evidence_minus_anchor_s=shared['arrival_s']-(anchor_at-start_wall),
                       evidence_applied_s=applied_wall-start_wall,
                       published_before_evidence=published_at < start_wall+shared['arrival_s'],
@@ -207,10 +220,13 @@ def main():
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--prime-anchor-cache', action='store_true',
                         help='render the same edited S1 before timing each arm')
+    parser.add_argument('--compare-evidence-first', action='store_true',
+                        help='compare gated overlap with gated evidence-first rendering')
     args = parser.parse_args()
     if args.poll <= 0 or args.timeout <= 0:
         parser.error('poll and timeout must be positive')
-    args.policy = list(POLICIES)
+    policies = SAFE_POLICIES if args.compare_evidence_first else POLICIES
+    args.policy = list(policies)
     root = args.output
     root.mkdir(parents=True)
     reports = {}
@@ -219,7 +235,7 @@ def main():
         for seed in spec['seeds']:
             block = f'{story}-{seed}'
             args.output = root / block
-            order = POLICIES if index % 2 == 0 else POLICIES[::-1]
+            order = policies if index % 2 == 0 else policies[::-1]
             index += 1
             case = dict(spec, story=story, seed=seed)
             try:

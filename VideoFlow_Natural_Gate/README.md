@@ -56,3 +56,22 @@ the report, including cache misses. Compare evidence and anchor timings,
 first published target coverage, and whether late repairs finished after
 publication. Cache priming is an experimental setup. It measures publication
 behavior conditional on reuse and does not measure how common reuse is.
+
+## Both arms gated: overlap versus evidence-first
+
+Use `--compare-evidence-first` to test if overlapping the anchor render
+with evidence acquisition helps when both policies already protect the
+first publication. Both arms use the same planner, publication gate, and
+evidence. The serial policy waits until all evidence is applied before
+dispatching any render. Once it starts, it has the same in-flight cap as
+the overlap policy. Arm order alternates across seeds.
+
+For each seed the VLM is called once, before either timed arm starts.
+Both arms replay its actual acquisition duration from edit start, so an
+arm's GPU execution cannot shift the other arm's evidence arrival. This
+controls the evidence delay. It does not measure contention during live
+VLM and renderer execution. Keep seed-level latency, first publication
+coverage, provider acceptances, and anchor cache observations. Report the
+paired latency difference for complete first publications; retain incomplete
+or failed runs separately. Record cache priming as a separate condition
+when using `--prime-anchor-cache`; use a fresh output directory for each.
