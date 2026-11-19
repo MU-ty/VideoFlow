@@ -1,0 +1,550 @@
+{
+  "budgets": [
+    2,
+    3,
+    4,
+    5
+  ],
+  "cases": {
+    "cassette-player-chain-93011": {
+      "candidates": [
+        "S2",
+        "S3"
+      ],
+      "distractor_marker": "red hexagon",
+      "edges": [
+        [
+          "S2",
+          "S5"
+        ],
+        [
+          "S5",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S2"
+      ],
+      "host": "a silver portable cassette player",
+      "independent": "A headphone cable and paper sleeve with no cassette player.",
+      "initial": "matte black",
+      "part": "{{target.color}} front volume knob",
+      "prompt": "Inspect each panel of a silver portable cassette player independently for front volume knob and the body marker. Target marker: red circle. Distractor marker: red hexagon. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S2",
+        "S3"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93011,
+      "story": "cassette-player-chain",
+      "target_marker": "red circle"
+    },
+    "cassette-player-chain-93012": {
+      "candidates": [
+        "S3",
+        "S4"
+      ],
+      "distractor_marker": "red hexagon",
+      "edges": [
+        [
+          "S4",
+          "S5"
+        ],
+        [
+          "S5",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S3"
+      ],
+      "host": "a silver portable cassette player",
+      "independent": "A headphone cable and paper sleeve with no cassette player.",
+      "initial": "matte black",
+      "part": "{{target.color}} front volume knob",
+      "prompt": "Inspect each panel of a silver portable cassette player independently for front volume knob and the body marker. Target marker: red circle. Distractor marker: red hexagon. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S4",
+        "S3"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93012,
+      "story": "cassette-player-chain",
+      "target_marker": "red circle"
+    },
+    "cassette-player-chain-93013": {
+      "candidates": [
+        "S2",
+        "S4"
+      ],
+      "distractor_marker": "red hexagon",
+      "edges": [
+        [
+          "S4",
+          "S5"
+        ],
+        [
+          "S5",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S4"
+      ],
+      "host": "a silver portable cassette player",
+      "independent": "A headphone cable and paper sleeve with no cassette player.",
+      "initial": "matte black",
+      "part": "{{target.color}} front volume knob",
+      "prompt": "Inspect each panel of a silver portable cassette player independently for front volume knob and the body marker. Target marker: red circle. Distractor marker: red hexagon. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S2",
+        "S4"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93013,
+      "story": "cassette-player-chain",
+      "target_marker": "red circle"
+    },
+    "compact-dehumidifier-fanout-93041": {
+      "candidates": [
+        "S2",
+        "S4"
+      ],
+      "distractor_marker": "yellow circle",
+      "edges": [
+        [
+          "S4",
+          "S5"
+        ],
+        [
+          "S4",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S2"
+      ],
+      "host": "a pale gray compact dehumidifier",
+      "independent": "A folded cloth beside an empty clear glass with no dehumidifier.",
+      "initial": "matte black",
+      "part": "{{target.color}} front humidity control dial",
+      "prompt": "Inspect each panel of a pale gray compact dehumidifier independently for front humidity control dial and the body marker. Target marker: yellow diamond. Distractor marker: yellow circle. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S2",
+        "S4"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93041,
+      "story": "compact-dehumidifier-fanout",
+      "target_marker": "yellow diamond"
+    },
+    "compact-dehumidifier-fanout-93042": {
+      "candidates": [
+        "S2",
+        "S3"
+      ],
+      "distractor_marker": "yellow circle",
+      "edges": [
+        [
+          "S3",
+          "S5"
+        ],
+        [
+          "S3",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S3"
+      ],
+      "host": "a pale gray compact dehumidifier",
+      "independent": "A folded cloth beside an empty clear glass with no dehumidifier.",
+      "initial": "matte black",
+      "part": "{{target.color}} front humidity control dial",
+      "prompt": "Inspect each panel of a pale gray compact dehumidifier independently for front humidity control dial and the body marker. Target marker: yellow diamond. Distractor marker: yellow circle. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S3",
+        "S2"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93042,
+      "story": "compact-dehumidifier-fanout",
+      "target_marker": "yellow diamond"
+    },
+    "compact-dehumidifier-fanout-93043": {
+      "candidates": [
+        "S3",
+        "S4"
+      ],
+      "distractor_marker": "yellow circle",
+      "edges": [
+        [
+          "S3",
+          "S5"
+        ],
+        [
+          "S3",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S4"
+      ],
+      "host": "a pale gray compact dehumidifier",
+      "independent": "A folded cloth beside an empty clear glass with no dehumidifier.",
+      "initial": "matte black",
+      "part": "{{target.color}} front humidity control dial",
+      "prompt": "Inspect each panel of a pale gray compact dehumidifier independently for front humidity control dial and the body marker. Target marker: yellow diamond. Distractor marker: yellow circle. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S3",
+        "S4"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93043,
+      "story": "compact-dehumidifier-fanout",
+      "target_marker": "yellow diamond"
+    },
+    "kitchen-scale-fanout-93021": {
+      "candidates": [
+        "S2",
+        "S4"
+      ],
+      "distractor_marker": "blue diamond",
+      "edges": [
+        [
+          "S4",
+          "S5"
+        ],
+        [
+          "S4",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S2"
+      ],
+      "host": "a cream mechanical kitchen scale",
+      "independent": "A folded tea towel beside an empty bowl with no scale.",
+      "initial": "matte black",
+      "part": "{{target.color}} front calibration knob",
+      "prompt": "Inspect each panel of a cream mechanical kitchen scale independently for front calibration knob and the body marker. Target marker: blue triangle. Distractor marker: blue diamond. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S4",
+        "S2"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93021,
+      "story": "kitchen-scale-fanout",
+      "target_marker": "blue triangle"
+    },
+    "kitchen-scale-fanout-93022": {
+      "candidates": [
+        "S2",
+        "S3"
+      ],
+      "distractor_marker": "blue diamond",
+      "edges": [
+        [
+          "S3",
+          "S5"
+        ],
+        [
+          "S3",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S3"
+      ],
+      "host": "a cream mechanical kitchen scale",
+      "independent": "A folded tea towel beside an empty bowl with no scale.",
+      "initial": "matte black",
+      "part": "{{target.color}} front calibration knob",
+      "prompt": "Inspect each panel of a cream mechanical kitchen scale independently for front calibration knob and the body marker. Target marker: blue triangle. Distractor marker: blue diamond. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S2",
+        "S3"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93022,
+      "story": "kitchen-scale-fanout",
+      "target_marker": "blue triangle"
+    },
+    "kitchen-scale-fanout-93023": {
+      "candidates": [
+        "S3",
+        "S4"
+      ],
+      "distractor_marker": "blue diamond",
+      "edges": [
+        [
+          "S3",
+          "S5"
+        ],
+        [
+          "S3",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S4"
+      ],
+      "host": "a cream mechanical kitchen scale",
+      "independent": "A folded tea towel beside an empty bowl with no scale.",
+      "initial": "matte black",
+      "part": "{{target.color}} front calibration knob",
+      "prompt": "Inspect each panel of a cream mechanical kitchen scale independently for front calibration knob and the body marker. Target marker: blue triangle. Distractor marker: blue diamond. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S4",
+        "S3"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93023,
+      "story": "kitchen-scale-fanout",
+      "target_marker": "blue triangle"
+    },
+    "metronome-chain-93031": {
+      "candidates": [
+        "S2",
+        "S3"
+      ],
+      "distractor_marker": "white triangle",
+      "edges": [
+        [
+          "S2",
+          "S5"
+        ],
+        [
+          "S5",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S2"
+      ],
+      "host": "a walnut mechanical metronome",
+      "independent": "A folded page of sheet music with no metronome.",
+      "initial": "matte black",
+      "part": "{{target.color}} front tempo adjustment slider",
+      "prompt": "Inspect each panel of a walnut mechanical metronome independently for front tempo adjustment slider and the body marker. Target marker: white circle. Distractor marker: white triangle. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S3",
+        "S2"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93031,
+      "story": "metronome-chain",
+      "target_marker": "white circle"
+    },
+    "metronome-chain-93032": {
+      "candidates": [
+        "S3",
+        "S4"
+      ],
+      "distractor_marker": "white triangle",
+      "edges": [
+        [
+          "S4",
+          "S5"
+        ],
+        [
+          "S5",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S3"
+      ],
+      "host": "a walnut mechanical metronome",
+      "independent": "A folded page of sheet music with no metronome.",
+      "initial": "matte black",
+      "part": "{{target.color}} front tempo adjustment slider",
+      "prompt": "Inspect each panel of a walnut mechanical metronome independently for front tempo adjustment slider and the body marker. Target marker: white circle. Distractor marker: white triangle. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S3",
+        "S4"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93032,
+      "story": "metronome-chain",
+      "target_marker": "white circle"
+    },
+    "metronome-chain-93033": {
+      "candidates": [
+        "S2",
+        "S4"
+      ],
+      "distractor_marker": "white triangle",
+      "edges": [
+        [
+          "S4",
+          "S5"
+        ],
+        [
+          "S5",
+          "S6"
+        ]
+      ],
+      "expected": [
+        "S4"
+      ],
+      "host": "a walnut mechanical metronome",
+      "independent": "A folded page of sheet music with no metronome.",
+      "initial": "matte black",
+      "part": "{{target.color}} front tempo adjustment slider",
+      "prompt": "Inspect each panel of a walnut mechanical metronome independently for front tempo adjustment slider and the body marker. Target marker: white circle. Distractor marker: white triangle. Record host and part visibility and whether the marker and part belong to the same object. The part is not itself a marker. Set complete=true only if readable with no unexamined host, or if no host is visible. Use unknown for ambiguous evidence. Return panel 1 (left) and panel 2 (right).\nApply the relevant items in this fixed checklist:\n- Check both marker identities independently. Trace the actual outline on the host body. Count visible corners if the identities differ in shape. Ignore part contours, shadows and reflections. Use unknown if the marker cannot be distinguished.\n- Trace the visible physical body that carries the marker, then follow that same body to the edited part. A marker on a host body and a part mounted elsewhere on that body still belong to the same object. Do not require the marker to be drawn on the part. Mark unknown if occlusion prevents tracing this relationship.\n- Check whether the marking is an elongated stripe with a rectangular outline. In this task record an elongated band, including a rectangular band, as stripe. Use rectangle for a compact rectangular patch. Retain the observed color and verify the marker is on the same physical host as the edited part.\n- First look for any physical host object, independently of its marker and whether it is the requested identity. An object with a different marker still counts as a visible host. Then check the part, marker, and ownership. Keep occluded fields unknown.",
+      "recheck_order": [
+        "S4",
+        "S2"
+      ],
+      "reference_motion": {
+        "S5": "Slow push-in, keeping the supplied witness object and its control intact.",
+        "S6": "Slow lateral move, keeping the supplied witness object and its control intact."
+      },
+      "seed": 93033,
+      "story": "metronome-chain",
+      "target_marker": "white circle"
+    }
+  },
+  "include_fixed_recheck": true,
+  "model": "qwen2.5vl:7b-ctx8k",
+  "options": {
+    "num_predict": 384,
+    "seed": 42,
+    "temperature": 0
+  },
+  "primary_budget": 3,
+  "requires_screen": true,
+  "schema": {
+    "additionalProperties": false,
+    "properties": {
+      "panels": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "color": {
+              "enum": [
+                "white",
+                "black",
+                "red",
+                "orange",
+                "yellow",
+                "blue",
+                "green",
+                "purple",
+                "silver",
+                "other",
+                "unknown"
+              ]
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "host_visible": {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ]
+            },
+            "location": {
+              "enum": [
+                "body",
+                "base",
+                "handle",
+                "lid",
+                "shade",
+                "other",
+                "unknown"
+              ]
+            },
+            "panel": {
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "part_visible": {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ]
+            },
+            "same_instance": {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ]
+            },
+            "shape": {
+              "enum": [
+                "circle",
+                "triangle",
+                "diamond",
+                "star",
+                "hexagon",
+                "rectangle",
+                "stripe",
+                "other",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "panel",
+            "host_visible",
+            "part_visible",
+            "same_instance",
+            "complete",
+            "shape",
+            "color",
+            "location"
+          ],
+          "type": "object"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      }
+    },
+    "required": [
+      "panels"
+    ],
+    "type": "object"
+  }
+}

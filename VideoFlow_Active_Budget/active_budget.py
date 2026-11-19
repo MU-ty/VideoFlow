@@ -102,7 +102,9 @@ def replay(case, bank, policy, budget, order):
                 {'S1'} | {s for s in order if s != shot and states[s][0] == 'confirmed'}, edges)
             impact = len(closure({shot}, edges) - other)
             verdict, uncertainty = states[shot]
-            if policy.startswith('fixed'):
+            if policy == 'fixed-recheck':
+                score = -priority.index(shot)
+            elif policy.startswith('fixed'):
                 score = -len(history[shot])
             elif policy == 'graph-static':
                 score = len(closure({shot}, edges)) / len(history[shot])
@@ -125,19 +127,19 @@ def replay(case, bank, policy, budget, order):
                 errors=sum(bool(bank[shot][index - 1].get('error')) for shot, index in trace))
 
 
-def score(cases, banks, budgets):
+def score(cases, banks, budgets, policies=POLICIES):
     rows = {}
     for index, (block, bank) in enumerate(sorted(banks.items())):
         order = cases[block].get('recheck_order', sorted(bank, reverse=bool(index % 2)))
         if len(order) != len(bank) or set(order) != set(bank):
             raise ValueError(f'invalid recheck order: {block}')
         rows[block] = {budget: {policy: replay(cases[block], bank, policy, budget, order)
-                               for policy in POLICIES}
+                               for policy in policies}
                        for budget in budgets}
     totals = {}
     for budget in budgets:
         totals[budget] = {}
-        for policy in POLICIES:
+        for policy in policies:
             runs = [row[budget][policy] for row in rows.values()]
             totals[budget][policy] = dict(
                 paired_seeds=len(runs),
@@ -304,18 +306,20 @@ def collect(args):
             raise ValueError('Ollama model changed during the run')
         results[block] = bank
         print(f'{block}: {sum(map(len, bank.values()))} archived calls', flush=True)
-    report = score(cases, results, BUDGETS)
+    budgets = protocol.get('budgets', BUDGETS)
+    policies = (*POLICIES, 'fixed-recheck') if protocol.get('include_fixed_recheck') else POLICIES
+    report = score(cases, results, budgets, policies)
     report.update(design='shared-response-bank-replay',
                   actual_bank_calls=sum(len(calls) for bank in results.values() for calls in bank.values()),
                   source_status={block: row['status'] for block, row in source_report.items()},
-                  primary_budget=3,
+                  primary_budget=protocol.get('primary_budget', 3),
                   eligibility={block: ('eligible' if block in included else 'excluded')
                                for block in results},
                   bank_errors=sum(bool(row.get('error')) for bank in results.values()
                                   for calls in bank.values() for row in calls))
     # Source eligibility is the pre-existing screen, frozen before this follow-up.
     eligible = {k: v for k, v in results.items() if k in included}
-    report['source_eligible'] = score(cases, eligible, BUDGETS)
+    report['source_eligible'] = score(cases, eligible, budgets, policies)
     return report
 
 

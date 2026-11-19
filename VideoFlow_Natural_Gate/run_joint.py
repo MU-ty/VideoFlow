@@ -197,9 +197,10 @@ def acquire(args, api, frozen, verifier, case, revision, log_path):
 
 def generated_manifest(case):
     assets = []
+    candidates = case.get('candidates', CANDIDATES)
     for i, shot in enumerate(('S1', 'S2', 'S3', 'S4', 'S5', 'S6')):
         values = {}
-        if shot in ('S1', 'S2', 'S3'):
+        if shot == 'S1' or shot in candidates:
             edited = shot == 'S1' or shot in case.get('expected', ('S3',))
             marker = case['target_marker'] if edited else case['distractor_marker']
             angle = 'Front three-quarter view' if shot != 'S3' else 'Tight side three-quarter view'
