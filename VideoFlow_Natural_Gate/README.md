@@ -39,3 +39,20 @@ archived source video URLs to remain readable on the same ComfyUI backend.
 The harness verifies the source manifest and archived video hashes on reuse.
 Use `--prepare-only` with a fresh output directory to validate all manifests
 without contacting the model servers.
+
+## Cache-primed anchor experiment
+
+Add `--prime-anchor-cache` to run the same four paired seeds with an edited
+S1 cache prime immediately before each arm. Priming runs one anchor render
+in a separate SQLite database. The timed arm starts from the common Rev.1
+and submits the same H3 graph with a distinct output prefix. The script
+checks that the upstream graphs are identical. VLM acquisition and replay
+retain their natural edit-relative timing.
+
+The report lists priming separately from timed provider acceptances. It
+records whether ComfyUI reports node 10 (the H3 sampler) cached for the
+timed anchor. A missing history is reported as unknown. Keep all runs in
+the report, including cache misses. Compare evidence and anchor timings,
+first published target coverage, and whether late repairs finished after
+publication. Cache priming is an experimental setup. It measures publication
+behavior conditional on reuse and does not measure how common reuse is.

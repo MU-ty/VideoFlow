@@ -12,6 +12,39 @@ from run_joint import CANDIDATES, KEY, ROOT, STORIES, acquire, check, load_json,
 POLICIES = ('ungated-worklist', 'gated-worklist')
 
 
+def edit_anchor(runtime, *, track_candidates):
+    event = dict(id='edit-2', expected_revision=1, target='S1', key=KEY,
+                 value='scarlet red', method='dair')
+    if track_candidates:
+        event['evidence_candidates'] = list(CANDIDATES)
+    plan = runtime.edit(event)
+    check(plan['regenerate'] == ['S1'], 'unexpected declared plan')
+    return plan
+
+
+def prime_anchor_cache(args, api, db, transport, refs, journal):
+    with closing(api['AssetRuntime'](db)) as runtime:
+        log(journal, 'prime_edit', plan=edit_anchor(runtime, track_candidates=False))
+        deadline = time.monotonic() + args.timeout
+        while time.monotonic() < deadline:
+            events = api['pass_once'](runtime, transport, build=refs.build)
+            log(journal, 'prime_worker', events=events)
+            check(not any(e['action'] in ('failed', 'rejected', 'validation_error') for e in events),
+                  f'cache priming failed: {events}')
+            snapshot = runtime.snapshot()
+            if snapshot['timeline']:
+                anchor, = (j for j in snapshot['jobs'] if j['asset'] == 'S1' and j['revision'] == 2)
+                return anchor
+            time.sleep(args.poll)
+    raise RuntimeError('cache priming did not finish before the deadline')
+
+
+def anchor_workflow(job):
+    graph = json.loads(job['execution_json'])
+    # Saving uses a unique prefix per job. The upstream H3 graph must be identical.
+    return {node: spec for node, spec in graph.items() if spec['class_type'] != 'SaveVideo'}
+
+
 def run_arm(args, api, root, seed_db, frozen, case, verifier, refs, backend, policy):
     root.mkdir()
     journal = root / 'events.jsonl'
@@ -33,6 +66,9 @@ def run_arm(args, api, root, seed_db, frozen, case, verifier, refs, backend, pol
     class Transport:
         base = backend.base
 
+        def __init__(self, path):
+            self.journal = path
+
         def inspect(self, prompt_id):
             result = backend.inspect(prompt_id)
             self.last_inspection = backend.last_inspection
@@ -40,26 +76,32 @@ def run_arm(args, api, root, seed_db, frozen, case, verifier, refs, backend, pol
 
         def submit(self, workflow, prompt_id):
             result = backend.submit(workflow, prompt_id)
-            log(journal, 'provider_acceptance', prompt_id=prompt_id)
+            log(self.journal, 'provider_acceptance', prompt_id=prompt_id)
             return result
 
     db = root / 'project.db'
-    with closing(sqlite3.connect(seed_db)) as source, closing(sqlite3.connect(db)) as dest:
-        source.backup(dest)
+    prime_job = None
+    with closing(sqlite3.connect(seed_db)) as source:
+        with closing(sqlite3.connect(db)) as dest:
+            source.backup(dest)
+        if args.prime_anchor_cache:
+            prime_db = root / 'cache-prime.db'
+            with closing(sqlite3.connect(prime_db)) as dest:
+                source.backup(dest)
+            prime_journal = root / 'cache-prime-events.jsonl'
+            prime_job = prime_anchor_cache(args, api, prime_db, Transport(prime_journal),
+                                           refs, prime_journal)
     write = api['write_json']
     with closing(Runtime(db)) as runtime, ThreadPoolExecutor(max_workers=1) as pool:
         initial = {row['asset']: row for row in runtime.snapshot()['timeline']}
         frame_index = load_json(frozen / 'index.json')
         expected = {'S1', 'S3', *(child for _, child in case['edges'])}
         start_wall, start = time.time(), time.monotonic()
-        plan = runtime.edit(dict(id='edit-2', expected_revision=1, target='S1',
-                                key=KEY, value='scarlet red', method='dair',
-                                evidence_candidates=list(CANDIDATES)))
-        check(plan['regenerate'] == ['S1'], 'unexpected declared plan')
+        plan = edit_anchor(runtime, track_candidates=True)
         log(journal, 'edit', plan=plan)
         future = pool.submit(acquire, args, api, frozen, verifier, case, 2,
                              root.parent / 'natural_vlm.jsonl') if live else None
-        transport = Transport()
+        transport = Transport(journal)
         applied_wall = None
         closure_ready_wall = None
         while time.monotonic() < start + args.timeout:
@@ -108,6 +150,13 @@ def run_arm(args, api, root, seed_db, frozen, case, verifier, refs, backend, pol
             'SELECT published_at FROM vf_timelines WHERE revision=2').fetchone()
         anchor, = [j for j in snapshot['jobs'] if j['asset'] == 'S1' and j['revision'] == 2]
         anchor_at = anchor['completed_at']
+        observation = next((row for row in api['summarize_inspections'](runtime)['jobs']
+                            if row['job'] == anchor['id']), None)
+        if prime_job is not None:
+            check(anchor_workflow(anchor) == anchor_workflow(prime_job),
+                  'priming and timed anchor differ upstream of SaveVideo')
+        sampler_cache_hit = ('10' in observation['cached_nodes']
+                             if observation and observation['history_seen'] else None)
         archive = api['archive_current'](runtime, root / 'media', backend.base, probe=True)
         first = {row['asset']: row for row in archive['assets']}
         regenerated = {shot for shot, row in first.items() if row['input_hash'] != initial[shot]['input_hash']}
@@ -139,9 +188,9 @@ def run_arm(args, api, root, seed_db, frozen, case, verifier, refs, backend, pol
                       final_materialized_missing_targets=sorted(expected-materialized),
                       provider_acceptances=sum(e['action'] == 'provider_acceptance' for e in events),
                       evidence_decisions={shot: item['decision'] for shot, item in shots.items()},
-                      anchor_provider_observation=next((row for row in
-                          api['summarize_inspections'](runtime)['jobs']
-                          if row['job'] == anchor['id']), None))
+                      anchor_provider_observation=observation,
+                      anchor_sampler_cache_hit=sampler_cache_hit,
+                      cache_prime_acceptances=int(prime_job is not None))
         write(root / 'report.json', report)
         return report
 
@@ -156,6 +205,8 @@ def main():
     parser.add_argument('--poll', type=float, default=1)
     parser.add_argument('--timeout', type=float, default=2400)
     parser.add_argument('--prepare-only', action='store_true')
+    parser.add_argument('--prime-anchor-cache', action='store_true',
+                        help='render the same edited S1 before timing each arm')
     args = parser.parse_args()
     if args.poll <= 0 or args.timeout <= 0:
         parser.error('poll and timeout must be positive')
