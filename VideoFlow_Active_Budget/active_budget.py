@@ -39,7 +39,7 @@ def closure(shots, edges):
         affected = expanded
 
 
-def observations(raw, schema, case):
+def observations(raw, schema, case, *, require_complete_for_distinct=True):
     rows = json.loads(raw)['panels']
     fields = schema['properties']['panels']['items']['properties']
     if len(rows) != 2 or {p['panel'] for p in rows} != {1, 2}:
@@ -54,7 +54,8 @@ def observations(raw, schema, case):
         marker = row['color'] + ' ' + row['shape']
         if linked and marker == case['target_marker']:
             votes.append('target')
-        elif linked and row['complete'] and marker == case['distractor_marker']:
+        elif (linked and marker == case['distractor_marker']
+              and (row['complete'] or not require_complete_for_distinct)):
             votes.append('distinct')
         else:
             votes.append('unknown')
@@ -255,6 +256,9 @@ def collect(args):
     metadata = dict(protocol_sha256=sha(args.protocol), model=identity(server, model),
                     source_report_sha256=sha(args.source_run / 'source-report.json'),
                     screen_sha256=sha(args.screen) if args.screen else None)
+    if ('rule_model_digest' in protocol
+            and metadata['model']['digest'] != protocol['rule_model_digest']):
+        raise ValueError('model digest differs from the locked validation protocol')
     metadata_path = args.output / 'metadata.json'
     if metadata_path.exists() and load(metadata_path) != metadata:
         raise ValueError('protocol, source, or model differs from this run')
