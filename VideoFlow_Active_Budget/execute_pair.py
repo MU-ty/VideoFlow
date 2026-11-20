@@ -1,7 +1,8 @@
-"""Execute the primary Round 930 pair from a frozen response bank and Rev.1."""
+"""Execute a matched pair from frozen VLM evidence and Rev.1."""
 
 import argparse
 from contextlib import closing
+import json
 from pathlib import Path
 import shutil
 import sqlite3
@@ -10,9 +11,11 @@ import sys
 import time
 
 from active_budget import FRACTIONS, closure, eligibility, load, observations, replay, save, sha
+from replay_negative_rule import analyze
 
 NATURAL = Path(__file__).resolve().parent.parent / 'VideoFlow_Natural_Gate'
 ARMS = ('fixed', 'uncertainty')
+RULES = ('strict', 'linked_only')
 DECISIONS = {'confirmed': 'match', 'distinct': 'distinct', 'unknown': 'fallback'}
 
 
@@ -35,6 +38,15 @@ def matched_inputs(args):
     if not included:
         raise ValueError('no eligible paired sources')
     budget = protocol['primary_budget']
+    if args.negative_rule_report is not None:
+        rule_report = load(args.negative_rule_report)
+        if budget != 3 or not protocol.get('rule_model_digest'):
+            raise ValueError('the negative-rule pair requires the frozen three-call protocol')
+        # JSON backup normalizes the integer budget keys returned by analyze().
+        if rule_report != json.loads(json.dumps(analyze(args.protocol, args.bank))):
+            raise ValueError('the supplied negative-rule report differs from verified replay')
+    else:
+        rule_report = None
     matches = {}
     for block in sorted(included):
         case = protocol['cases'][block]
@@ -62,12 +74,25 @@ def matched_inputs(args):
                     raise ValueError(f'bank reply provenance mismatch: {path}')
                 bank[shot].append(row)
         plans = {}
-        for arm in ARMS:
-            plan = replay(case, bank, arm, budget, case['recheck_order'])
-            if plan != frozen[block][str(budget)][arm]:
+        for arm in RULES if rule_report else ARMS:
+            allocation = 'uncertainty' if rule_report else arm
+            arm_bank = bank
+            expected = frozen[block][str(budget)][allocation]
+            if arm == 'linked_only':
+                arm_bank = {
+                    shot: [
+                        dict(row, votes=observations(row['raw'], protocol['schema'], case,
+                             require_complete_for_distinct=False)) if not row.get('error') else row
+                        for row in rows
+                    ] for shot, rows in bank.items()
+                }
+            if rule_report:
+                expected = rule_report[arm]['seeds'][block][str(budget)][allocation]
+            plan = replay(case, arm_bank, allocation, budget, case['recheck_order'])
+            if plan != expected:
                 raise ValueError(f'bank replay mismatch: {block}/{arm}')
             plans[arm] = dict(plan, evidence=[
-                dict(shot=shot, view=index, **bank[shot][index - 1])
+                dict(shot=shot, view=index, **arm_bank[shot][index - 1])
                 for shot, index in plan['trace']])
         matches[block] = (case, root, origin, plans)
     return budget, matches
@@ -92,7 +117,7 @@ def render_arm(args, api, backend, directory, source, origin, case, evidence, ke
                 {shot: tuple(a[k] for k in fields) for shot, a in origin.items()}):
             raise ValueError('Rev.1 database does not match the archive')
         candidates = case['candidates']
-        runtime.edit(dict(id='budget-930', expected_revision=1, target='S1',
+        runtime.edit(dict(id='frozen-budget-pair', expected_revision=1, target='S1',
                           key=key, value='scarlet red', evidence_candidates=candidates))
         for shot in candidates:
             votes = [row for row in evidence['evidence'] if row['shot'] == shot]
@@ -147,6 +172,7 @@ def render_arm(args, api, backend, directory, source, origin, case, evidence, ke
                     missed=sorted(expected - rendered), excess=sorted(rendered - expected),
                     first_publication_covers_required=expected <= rendered,
                     first_publication_exact=expected == rendered,
+                    byte_reused=sorted(current.keys() - rendered),
                     edit_to_first_publication_s=elapsed, acknowledged_submissions=accepted,
                     completed_edit_jobs=sum(j['status'] == 'succeeded' for j in edit_jobs),
                     jobs_with_provider_history=sum(j['history_seen'] for j in inspections),
@@ -158,19 +184,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for flag in ('protocol', 'source-run', 'screen', 'bank', 'output'):
         parser.add_argument('--' + flag, required=True, type=Path)
+    parser.add_argument('--negative-rule-report', type=Path,
+                        help='Run strict vs. linked-only with uncertainty priority at three calls')
     parser.add_argument('--server', default='http://127.0.0.1:8188')
     parser.add_argument('--timeout', type=float, default=2400)
     parser.add_argument('--poll', type=float, default=2)
     parser.add_argument('--prepare-only', action='store_true')
     args = parser.parse_args()
+    if args.negative_rule_report is None and load(args.protocol).get('rule_model_digest'):
+        parser.error('supply --negative-rule-report for the locked negative-vote protocol')
     if args.timeout <= 0 or args.poll <= 0:
         parser.error('timeout and poll must be positive')
     budget, inputs = matched_inputs(args)
     args.output.mkdir(parents=True)
-    order = {block: list(ARMS if i % 2 == 0 else ARMS[::-1])
+    arms = RULES if args.negative_rule_report else ARMS
+    order = {block: list(arms if i % 2 == 0 else arms[::-1])
              for i, block in enumerate(inputs)}
     result = dict(budget=budget, execution='frozen-evidence', arm_order=order,
                   protocol_sha256=sha(args.protocol), bank_report_sha256=sha(args.bank / 'report.json'),
+                  negative_rule_report_sha256=sha(args.negative_rule_report) if args.negative_rule_report else None,
                   blocks={}, failures={})
     save(args.output / 'report.json', result)
     if args.prepare_only:
@@ -196,10 +228,18 @@ def main():
                 raise
             save(args.output / 'report.json', result)
     pairs = list(result['blocks'].values())
+    baseline, treatment = arms
+    covered = [p for p in pairs if all(p[arm]['first_publication_covers_required'] for arm in arms)]
+    result['pairs_with_required_coverage_in_both'] = len(covered)
+    result['total_acknowledged_submissions_saved'] = sum(
+        p[baseline]['acknowledged_submissions'] - p[treatment]['acknowledged_submissions'] for p in pairs)
+    result['paired_median_coverage_publication_difference_s'] = median(
+        p[baseline]['edit_to_first_publication_s'] - p[treatment]['edit_to_first_publication_s']
+        for p in covered) if covered else None
     result['total_completed_edit_jobs_saved'] = sum(
-        p['fixed']['completed_edit_jobs'] - p['uncertainty']['completed_edit_jobs'] for p in pairs)
+        p[baseline]['completed_edit_jobs'] - p[treatment]['completed_edit_jobs'] for p in pairs)
     result['paired_median_publication_difference_s'] = median(
-        p['fixed']['edit_to_first_publication_s'] - p['uncertainty']['edit_to_first_publication_s']
+        p[baseline]['edit_to_first_publication_s'] - p[treatment]['edit_to_first_publication_s']
         for p in pairs)
     save(args.output / 'report.json', result)
 
