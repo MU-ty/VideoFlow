@@ -1,0 +1,132 @@
+{
+  "round": 956,
+  "backend": "H3",
+  "width": 864,
+  "height": 480,
+  "frames": 124,
+  "steps": 20,
+  "cases": {
+    "audio-interface-95611": {
+      "condition": "same-decal",
+      "truth": {
+        "S1": "same",
+        "S2": "distinct",
+        "S3": "same"
+      }
+    },
+    "bench-supply-95621": {
+      "condition": "same-decal",
+      "truth": {
+        "S1": "same",
+        "S2": "distinct",
+        "S3": "same"
+      }
+    },
+    "photo-timer-95631": {
+      "condition": "cross-view",
+      "truth": {
+        "S1": "same",
+        "S2": "distinct",
+        "S3": "same"
+      }
+    },
+    "soldering-station-95641": {
+      "condition": "cross-view",
+      "truth": {
+        "S1": "same",
+        "S2": "distinct",
+        "S3": "same"
+      }
+    },
+    "grain-scale-95651": {
+      "condition": "partial-occlusion",
+      "truth": {
+        "S1": "same",
+        "S2": "distinct",
+        "S3": "same"
+      }
+    },
+    "film-rewinder-95661": {
+      "condition": "partial-occlusion",
+      "truth": {
+        "S1": "same",
+        "S2": "distinct",
+        "S3": "same"
+      }
+    }
+  },
+  "clips": {
+    "audio-interface-95611/S1": {
+      "noise_seed": 95611,
+      "prompt": "Photorealistic continuous five-second product shot on a light gray acoustic workshop table under diffuse light. The main device is a charcoal rectangular audio interface with one large round black monitor dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Fixed frontal view of the main device alone; the blue triangular sticker is firmly attached to its front face beside the dial. Show both landmarks clearly throughout."
+    },
+    "audio-interface-95611/S2": {
+      "noise_seed": 95612,
+      "prompt": "Photorealistic continuous five-second product shot on a light gray acoustic workshop table under diffuse light. The main device is a charcoal rectangular audio interface with one large round black monitor dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. The main device is unmarked. A physically separate small dark direct-injection box sits to its right. The only blue triangular sticker is attached to the front of the smaller separate device. It has no dial. Show tabletop separating the housings for at least part of the clip. Do not attach the sticker to the main device. Keep both landmarks in frame. "
+    },
+    "audio-interface-95611/S3": {
+      "noise_seed": 95613,
+      "prompt": "Photorealistic continuous five-second product shot on a light gray acoustic workshop table under diffuse light. The main device is a charcoal rectangular audio interface with one large round black monitor dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Only the main device is present. Its only blue triangular sticker is attached firmly to its own face beside the dial. Change the camera angle relative to the frontal shot. Keep both landmarks in frame. "
+    },
+    "bench-supply-95621/S1": {
+      "noise_seed": 95621,
+      "prompt": "Photorealistic continuous five-second product shot on a off-white electronics workbench under diffuse light. The main device is a deep navy compact bench power supply with one large round black voltage dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Fixed frontal view of the main device alone; the blue triangular sticker is firmly attached to its front face beside the dial. Show both landmarks clearly throughout."
+    },
+    "bench-supply-95621/S2": {
+      "noise_seed": 95622,
+      "prompt": "Photorealistic continuous five-second product shot on a off-white electronics workbench under diffuse light. The main device is a deep navy compact bench power supply with one large round black voltage dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. The main device is unmarked. A physically separate small dark multimeter case sits to its right. The only blue triangular sticker is attached to the front of the smaller separate device. It has no dial. Show tabletop separating the housings for at least part of the clip. Do not attach the sticker to the main device. Keep both landmarks in frame. "
+    },
+    "bench-supply-95621/S3": {
+      "noise_seed": 95623,
+      "prompt": "Photorealistic continuous five-second product shot on a off-white electronics workbench under diffuse light. The main device is a deep navy compact bench power supply with one large round black voltage dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Only the main device is present. Its only blue triangular sticker is attached firmly to its own face beside the dial. Change the camera angle relative to the frontal shot. Keep both landmarks in frame. "
+    },
+    "photo-timer-95631/S1": {
+      "noise_seed": 95631,
+      "prompt": "Photorealistic continuous five-second product shot on a light gray photo studio table under diffuse light. The main device is a dark olive rectangular darkroom timer with one large round black timer dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Fixed frontal view of the main device alone; the blue triangular sticker is firmly attached to its front face beside the dial. Show both landmarks clearly throughout."
+    },
+    "photo-timer-95631/S2": {
+      "noise_seed": 95632,
+      "prompt": "Photorealistic continuous five-second product shot on a light gray photo studio table under diffuse light. The main device is a dark olive rectangular darkroom timer with one large round black timer dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. The main device is unmarked. A physically separate small dark remote shutter enclosure sits to its right. The only blue triangular sticker is attached to the front of the smaller separate device. It has no dial. Show tabletop separating the housings for at least part of the clip. Do not attach the sticker to the main device. Keep both landmarks in frame. Use an obvious smooth quarter-orbit of approximately 45 degrees from front to three-quarter view. "
+    },
+    "photo-timer-95631/S3": {
+      "noise_seed": 95633,
+      "prompt": "Photorealistic continuous five-second product shot on a light gray photo studio table under diffuse light. The main device is a dark olive rectangular darkroom timer with one large round black timer dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Only the main device is present. Its only blue triangular sticker is attached firmly to its own face beside the dial. Change the camera angle relative to the frontal shot. Keep both landmarks in frame. Use an obvious smooth quarter-orbit of approximately 45 degrees from front to three-quarter view. "
+    },
+    "soldering-station-95641/S1": {
+      "noise_seed": 95641,
+      "prompt": "Photorealistic continuous five-second product shot on a white repair desk under diffuse light. The main device is a charcoal compact soldering controller with one large round black temperature dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Fixed frontal view of the main device alone; the blue triangular sticker is firmly attached to its front face beside the dial. Show both landmarks clearly throughout."
+    },
+    "soldering-station-95641/S2": {
+      "noise_seed": 95642,
+      "prompt": "Photorealistic continuous five-second product shot on a white repair desk under diffuse light. The main device is a charcoal compact soldering controller with one large round black temperature dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. The main device is unmarked. A physically separate small dark tip cleaner case sits to its right. The only blue triangular sticker is attached to the front of the smaller separate device. It has no dial. Show tabletop separating the housings for at least part of the clip. Do not attach the sticker to the main device. Keep both landmarks in frame. Use an obvious smooth quarter-orbit of approximately 45 degrees from front to three-quarter view. "
+    },
+    "soldering-station-95641/S3": {
+      "noise_seed": 95643,
+      "prompt": "Photorealistic continuous five-second product shot on a white repair desk under diffuse light. The main device is a charcoal compact soldering controller with one large round black temperature dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Only the main device is present. Its only blue triangular sticker is attached firmly to its own face beside the dial. Change the camera angle relative to the frontal shot. Keep both landmarks in frame. Use an obvious smooth quarter-orbit of approximately 45 degrees from front to three-quarter view. "
+    },
+    "grain-scale-95651/S1": {
+      "noise_seed": 95651,
+      "prompt": "Photorealistic continuous five-second product shot on a light gray kitchen worktop under diffuse light. The main device is a deep navy rectangular grain-scale controller with one large round black adjustment dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Fixed frontal view of the main device alone; the blue triangular sticker is firmly attached to its front face beside the dial. Show both landmarks clearly throughout."
+    },
+    "grain-scale-95651/S2": {
+      "noise_seed": 95652,
+      "prompt": "Photorealistic continuous five-second product shot on a light gray kitchen worktop under diffuse light. The main device is a deep navy rectangular grain-scale controller with one large round black adjustment dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. The main device is unmarked. A physically separate small dark sensor enclosure sits to its right. The only blue triangular sticker is attached to the front of the smaller separate device. It has no dial. Show tabletop separating the housings for at least part of the clip. Do not attach the sticker to the main device. At the first instant the dial and sticker are both fully visible. A matte light-gray foreground flap then passes across and briefly hides only part of the blue sticker before moving away. The dial remains visible. "
+    },
+    "grain-scale-95651/S3": {
+      "noise_seed": 95653,
+      "prompt": "Photorealistic continuous five-second product shot on a light gray kitchen worktop under diffuse light. The main device is a deep navy rectangular grain-scale controller with one large round black adjustment dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Only the main device is present. Its only blue triangular sticker is attached firmly to its own face beside the dial. Change the camera angle relative to the frontal shot. At the first instant the dial and sticker are both fully visible. A matte light-gray foreground flap then passes across and briefly hides only part of the blue sticker before moving away. The dial remains visible. "
+    },
+    "film-rewinder-95661/S1": {
+      "noise_seed": 95661,
+      "prompt": "Photorealistic continuous five-second product shot on a matte white studio tabletop under diffuse light. The main device is a dark olive rectangular film rewinder controller with one large round black speed dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Fixed frontal view of the main device alone; the blue triangular sticker is firmly attached to its front face beside the dial. Show both landmarks clearly throughout."
+    },
+    "film-rewinder-95661/S2": {
+      "noise_seed": 95662,
+      "prompt": "Photorealistic continuous five-second product shot on a matte white studio tabletop under diffuse light. The main device is a dark olive rectangular film rewinder controller with one large round black speed dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. The main device is unmarked. A physically separate small dark film counter enclosure sits to its right. The only blue triangular sticker is attached to the front of the smaller separate device. It has no dial. Show tabletop separating the housings for at least part of the clip. Do not attach the sticker to the main device. At the first instant the dial and sticker are both fully visible. A matte light-gray foreground flap then passes across and briefly hides only part of the blue sticker before moving away. The dial remains visible. "
+    },
+    "film-rewinder-95661/S3": {
+      "noise_seed": 95663,
+      "prompt": "Photorealistic continuous five-second product shot on a matte white studio tabletop under diffuse light. The main device is a dark olive rectangular film rewinder controller with one large round black speed dial. Exactly one small solid blue triangular sticker in the scene. No cuts, text, hands, glow, or other decorative markings. Only the main device is present. Its only blue triangular sticker is attached firmly to its own face beside the dial. Change the camera angle relative to the frontal shot. At the first instant the dial and sticker are both fully visible. A matte light-gray foreground flap then passes across and briefly hides only part of the blue sticker before moving away. The dial remains visible. "
+    }
+  }
+}
