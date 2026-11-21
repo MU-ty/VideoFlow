@@ -34,10 +34,11 @@ def inset_pair(source, output, anchor, candidate):
     ], check=True)
 
 
-def prepare(source, output, regions):
-    if set(regions) != set(pair.CASES):
-        raise ValueError('region blocks differ from the frozen Round 925 cases')
-    inputs = pair.build_inputs(source, pair.CASES, output)
+def prepare(source, output, regions, cases=None):
+    cases = pair.CASES if cases is None else cases
+    if set(regions) != set(cases):
+        raise ValueError('region blocks differ from the evaluation cases')
+    inputs = pair.build_inputs(source, cases, output)
     panels = tuple(p + 1 for p in pair.VIEWS)
     for item in inputs:
         block = regions[item['block']]
