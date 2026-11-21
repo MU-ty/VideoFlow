@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import sqlite3
 from statistics import median
+from tempfile import mkdtemp
 import sys
 import time
 
@@ -51,7 +52,11 @@ def observer_for(prepared, inputs):
                     value, failed = split.query(args.ollama, verifier['model'], prepared, log,
                                                 item, policy, stage, image, prompt, schema, seed)
                     if failed:
-                        raise RuntimeError(f'model call failed: {shot}/{item["panel"]}/{stage}; see {journal}')
+                        last_call = json.loads(journal.read_text(encoding='utf-8').splitlines()[-1])
+                        raise RuntimeError(
+                            f'model call failed: {shot}/{item["panel"]}/{stage}: '
+                            f'{last_call["error"]}; see {journal}'
+                        )
                     responses.append(value)
                     shots[shot]['calls'].append(dict(
                         phase=stage, panel=item['panel'], image_sha256=image['sha256'],
@@ -111,6 +116,18 @@ def summary(results):
     return output
 
 
+def archive_previous_attempt(output, block, policy):
+    root = output / block
+    paths = (root / policy, root / (policy + '-references'))
+    if any(path.exists() for path in paths):
+        archive_root = output / 'previous_attempts' / block
+        archive_root.mkdir(parents=True, exist_ok=True)
+        dest = Path(mkdtemp(prefix=policy + '-', dir=archive_root))
+        for path in paths:
+            if path.exists():
+                path.rename(dest / path.name)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--engine', type=Path, default=Path('VideoFlow_Evidence_Gap'))
@@ -121,7 +138,11 @@ def main():
     parser.add_argument('--timeout', type=float, default=2400)
     parser.add_argument('--poll', type=float, default=2)
     parser.add_argument('--validate-only', action='store_true')
+    parser.add_argument('--resume', action='store_true',
+                        help='reuse the given run directory and rerun incomplete arms from Rev.1')
     args = parser.parse_args()
+    if args.resume and args.validate_only:
+        parser.error('--resume requires an online run')
     if args.timeout <= 0 or args.poll <= 0:
         parser.error('timeout and poll must be positive')
     if not shutil.which('ffmpeg') or not shutil.which('ffprobe'):
@@ -148,39 +169,65 @@ def main():
             parser.error('expected the Round 925 model digest')
         backend = api['ComfyUI'](args.server)
         api['check_backend'](backend)
-    args.output.mkdir(parents=True)
     prepared = args.output / 'paired_inputs'
-    prepared.mkdir()
     regions = engine.load_json(Path(__file__).with_name('marker_regions_925.json'))
-    prep_start = time.monotonic()
-    inputs = split.prepare(args.source_run, prepared, regions)
-    write(args.output / 'protocol.json', dict(
+    protocol = dict(
         blocks=list(archives), arms=list(ARMS), engine_sha256=ENGINE_FILES, regions=regions,
         panel_numbers=[i+1 for i in pair.VIEWS], calls_per_arm_per_block=12,
-        preparation_s=time.monotonic()-prep_start,
         timing='from edit to first publication; excludes preparing shared fixed crop views',
-        model=None if args.validate_only else identity))
-    write(prepared / 'index.json', inputs)
+        model=None if args.validate_only else identity)
+    if args.resume:
+        recorded = engine.load_json(args.output / 'protocol.json')
+        if any(recorded.get(key) != value for key, value in protocol.items()):
+            parser.error('resume protocol or Ollama model identity differs from the original run')
+        inputs = engine.load_json(prepared / 'index.json')
+        expected = {(block, shot, panel) for block in archives for shot in pair.CANDIDATES
+                    for panel in protocol['panel_numbers']}
+        indexed = {(item['block'], item['shot'], item['panel']) for item in inputs}
+        if len(inputs) != len(expected) or indexed != expected:
+            parser.error('resume inputs are incomplete or do not match the protocol')
+        results = engine.load_json(args.output / 'report.json')
+        if set(results) != set(archives):
+            parser.error('resume report does not cover the original archived seeds')
+    else:
+        args.output.mkdir(parents=True)
+        prepared.mkdir()
+        prep_start = time.monotonic()
+        inputs = split.prepare(args.source_run, prepared, regions)
+        write(args.output / 'protocol.json', dict(
+            protocol, preparation_s=time.monotonic()-prep_start))
+        write(prepared / 'index.json', inputs)
+        results = {block: dict(status='pending', policies={}) for block in archives}
     print(f'Validated {len(archives)} archived seeds and {len(inputs)} paired inputs.', flush=True)
     if args.validate_only:
         return
-    results = {block: dict(status='pending', policies={}) for block in archives}
     for index, (block, archive) in enumerate(archives.items()):
         seed = args.source_run / block
         root = args.output / block
-        root.mkdir()
-        shutil.copytree(seed / 'source_media', root / 'source_media')
+        root.mkdir(exist_ok=args.resume)
+        if not (root / 'source_media').exists():
+            shutil.copytree(seed / 'source_media', root / 'source_media')
+        else:
+            for asset in archive['assets']:
+                if api['checksum'](root / 'source_media' / asset['file']) != asset['sha256']:
+                    raise ValueError(f'working source clip changed: {block}/{asset["asset"]}')
         observer = observer_for(prepared, [item for item in inputs if item['block'] == block])
         order = ARMS if index % 2 == 0 else ARMS[::-1]
         row = results[block]
         row['arm_order'] = list(order)
         row['status'] = 'running'
         for policy in order:
+            previous = row['policies'].get(policy, {})
+            if args.resume and previous.get('status') == 'completed':
+                print(f'{block}: keeping completed {policy}', flush=True)
+                continue
             print(f'{block}: {policy}', flush=True)
-            row['policies'][policy] = dict(status='running')
-            write(args.output / 'report.json', results)
             try:
                 api['check_backend'](backend)
+                if args.resume:
+                    archive_previous_attempt(args.output, block, policy)
+                row['policies'][policy] = dict(status='running')
+                write(args.output / 'report.json', results)
                 refs = api['ReferenceFrames'](root / (policy + '-references'), backend)
                 arm = weak.run_policy(args, api, root / policy, seed / 'source.db',
                                       archive, cases[block], verifier, refs, backend, policy,
