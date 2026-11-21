@@ -1,0 +1,91 @@
+{
+  "round": 957,
+  "backend": "H3",
+  "conditioning": "first_frame",
+  "width": 864,
+  "height": 480,
+  "frames": 124,
+  "steps": 20,
+  "cases": {
+    "voltage-indicator-95711": {
+      "condition": "same-decal",
+      "truth": {
+        "S1": "same",
+        "S2": "distinct",
+        "S3": "same"
+      }
+    },
+    "signal-router-95721": {
+      "condition": "cross-view",
+      "truth": {
+        "S1": "same",
+        "S2": "distinct",
+        "S3": "same"
+      }
+    },
+    "interval-controller-95731": {
+      "condition": "partial-occlusion",
+      "truth": {
+        "S1": "same",
+        "S2": "distinct",
+        "S3": "same"
+      }
+    }
+  },
+  "clips": {
+    "voltage-indicator-95711/S1": {
+      "prompt": "Continuous five-second product video starting from the supplied image. Preserve the exact enclosures, black dial and blue adhesive triangle from the input, including which front panel the triangle is attached to. Every object keeps its shape, position, appearance, and identity. Stable soft studio lighting. No cuts, captions, or hands. The dial and the only triangle stay on the same front panel. Very subtle camera movement, keep both landmarks fully visible.",
+      "noise_seed": 95711,
+      "reference": "references/voltage-indicator-95711/S1.png",
+      "reference_sha256": "979be51d20b0bddb8f40a75b038d769f330b096e759ee7a8ff0ae80588be0757"
+    },
+    "voltage-indicator-95711/S2": {
+      "prompt": "Continuous five-second product video starting from the supplied image. Preserve the exact enclosures, black dial and blue adhesive triangle from the input, including which front panel the triangle is attached to. Every object keeps its shape, position, appearance, and identity. Stable soft studio lighting. No cuts, captions, or hands. The only triangle remains on the physically separate small accessory; the larger unit has the dial and no sticker. Very subtle camera movement, keep both landmarks fully visible.",
+      "noise_seed": 95712,
+      "reference": "references/voltage-indicator-95711/S2.png",
+      "reference_sha256": "6fb2f381dceb9008851008215b8496e380be5950e2325dfc0edd089e9223eb93"
+    },
+    "voltage-indicator-95711/S3": {
+      "prompt": "Continuous five-second product video starting from the supplied image. Preserve the exact enclosures, black dial and blue adhesive triangle from the input, including which front panel the triangle is attached to. Every object keeps its shape, position, appearance, and identity. Stable soft studio lighting. No cuts, captions, or hands. The dial and the only triangle stay on the same front panel. Very subtle camera movement, keep both landmarks fully visible.",
+      "noise_seed": 95713,
+      "reference": "references/voltage-indicator-95711/S3.png",
+      "reference_sha256": "fdf0cdfa4a2a4e9420e6d7686ba993a0f546f40feb935e32d6d5e73bc0eeb5a4"
+    },
+    "signal-router-95721/S1": {
+      "prompt": "Continuous five-second product video starting from the supplied image. Preserve the exact enclosures, black dial and blue adhesive triangle from the input, including which front panel the triangle is attached to. Every object keeps its shape, position, appearance, and identity. Stable soft studio lighting. No cuts, captions, or hands. The dial and the only triangle stay on the same front panel. Very subtle camera movement, keep both landmarks fully visible.",
+      "noise_seed": 95721,
+      "reference": "references/signal-router-95721/S1.png",
+      "reference_sha256": "4eedde5259f74df9cc82cc6fcd5d0fa04ac70e07f8eac5e49556b6c4f0c467bb"
+    },
+    "signal-router-95721/S2": {
+      "prompt": "Continuous five-second product video starting from the supplied image. Preserve the exact enclosures, black dial and blue adhesive triangle from the input, including which front panel the triangle is attached to. Every object keeps its shape, position, appearance, and identity. Stable soft studio lighting. No cuts, captions, or hands. The only triangle remains on the physically separate small accessory; the larger unit has the dial and no sticker. Maintain the view for the opening half second, then orbit smoothly a further 15 degrees without losing either landmark or relocating either device.",
+      "noise_seed": 95722,
+      "reference": "references/signal-router-95721/S2.png",
+      "reference_sha256": "c0e2732018ab69c6287c158d7ad02c64a758e8fcd32e959a432c2771e67fb2db"
+    },
+    "signal-router-95721/S3": {
+      "prompt": "Continuous five-second product video starting from the supplied image. Preserve the exact enclosures, black dial and blue adhesive triangle from the input, including which front panel the triangle is attached to. Every object keeps its shape, position, appearance, and identity. Stable soft studio lighting. No cuts, captions, or hands. The dial and the only triangle stay on the same front panel. Maintain the view for the opening half second, then orbit smoothly a further 15 degrees without losing either landmark or relocating either device.",
+      "noise_seed": 95723,
+      "reference": "references/signal-router-95721/S3.png",
+      "reference_sha256": "11657281852d268a2b5b74b649932ed76205006dc2b143b443a4509a9e4dc723"
+    },
+    "interval-controller-95731/S1": {
+      "prompt": "Continuous five-second product video starting from the supplied image. Preserve the exact enclosures, black dial and blue adhesive triangle from the input, including which front panel the triangle is attached to. Every object keeps its shape, position, appearance, and identity. Stable soft studio lighting. No cuts, captions, or hands. The dial and the only triangle stay on the same front panel. Very subtle camera movement, keep both landmarks fully visible.",
+      "noise_seed": 95731,
+      "reference": "references/interval-controller-95731/S1.png",
+      "reference_sha256": "91331aa03c7cfff031e482d1c3e72f2323eb13f369805fff86d71e32d876ebd8"
+    },
+    "interval-controller-95731/S2": {
+      "prompt": "Continuous five-second product video starting from the supplied image. Preserve the exact enclosures, black dial and blue adhesive triangle from the input, including which front panel the triangle is attached to. Every object keeps its shape, position, appearance, and identity. Stable soft studio lighting. No cuts, captions, or hands. The only triangle remains on the physically separate small accessory; the larger unit has the dial and no sticker. Keep both landmarks fully visible for the first second. A narrow matte ivory foreground card then glides in from the right, crossing only the right half of the triangle at mid-clip while keeping the dial visible, then leaves so the entire unchanged triangle is clearly visible again by the last second. The card sits visibly in front of the housing. No other motion.",
+      "noise_seed": 95732,
+      "reference": "references/interval-controller-95731/S2.png",
+      "reference_sha256": "f00980c6e096cf461616713751691721472a90d1bad24eae697355cafa05e32c"
+    },
+    "interval-controller-95731/S3": {
+      "prompt": "Continuous five-second product video starting from the supplied image. Preserve the exact enclosures, black dial and blue adhesive triangle from the input, including which front panel the triangle is attached to. Every object keeps its shape, position, appearance, and identity. Stable soft studio lighting. No cuts, captions, or hands. The dial and the only triangle stay on the same front panel. Keep both landmarks fully visible for the first second. A narrow matte ivory foreground card then glides in from the right, crossing only the right half of the triangle at mid-clip while keeping the dial visible, then leaves so the entire unchanged triangle is clearly visible again by the last second. The card sits visibly in front of the housing. No other motion.",
+      "noise_seed": 95733,
+      "reference": "references/interval-controller-95731/S3.png",
+      "reference_sha256": "1b6eb468ca319ae6afcb17275e567ab59e526b6a3c678c18030369f20b993554"
+    }
+  }
+}
