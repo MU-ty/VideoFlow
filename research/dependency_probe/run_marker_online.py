@@ -22,14 +22,15 @@ ENGINE_FILES = {
 }
 
 
-def observer_for(prepared, inputs):
+def observer_for(prepared, inputs, source_screen=None):
+    source_screen = FROZEN_SCREEN if source_screen is None else source_screen
     def observe(args, api, frozen, verifier, case, revision, journal, policy):
         started = time.monotonic()
         source_hashes = json.loads((frozen / 'index.json').read_text())
         shots = {shot: dict(calls=[], votes=[]) for shot in pair.CANDIDATES}
         direct = pair.COMMON.format(part=case['part'].removeprefix('{{target.color}} ')) + pair.DIRECT
         for shot in shots:
-            if source_hashes[shot]['clip_sha256'] != FROZEN_SCREEN[inputs[0]['block']][shot]['clip_sha256']:
+            if source_hashes[shot]['clip_sha256'] != source_screen[inputs[0]['block']][shot]['clip_sha256']:
                 raise ValueError(f'live candidate is not the archived Rev.1 clip: {shot}')
         with journal.open('x', encoding='utf-8') as log:
             for item in inputs:
