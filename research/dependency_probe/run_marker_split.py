@@ -77,8 +77,8 @@ def transform(source, output, filters):
     return {'file': output.name, 'sha256': pair.sha(output)}
 
 
-def prepare(source, output, regions):
-    inputs = region.prepare(source, output, regions)
+def prepare(source, output, regions, cases=None):
+    inputs = region.prepare(source, output, regions, cases)
     for item in inputs:
         full = output / item['file']
         inset = output / item['inset']['file']
