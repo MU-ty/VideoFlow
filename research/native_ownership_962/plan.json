@@ -1,0 +1,17 @@
+{
+  "model": "qwen2.5vl:7b-ctx8k",
+  "shots": ["S1", "S2", "S3"],
+  "truth": {"S1":"same", "S2":"distinct", "S3":"same"},
+  "cases": {
+    "96201": ["cross-face"],
+    "96202": ["cross-face", "cross-view"],
+    "96203": ["same-decal", "similar-shape"],
+    "96204": ["same-decal", "similar-shape", "cross-view"],
+    "96205": ["partial-occlusion"],
+    "96206": ["partial-occlusion", "cross-view"],
+    "96207": ["reappearance"],
+    "96208": ["reappearance", "similar-shape"]
+  },
+  "frame_fractions": [0, 0.25, 0.5, 0.75, 1],
+  "vlm_instruction": "These unmarked full-frame images are from the same shot in chronological order. The designated control is the main round knob and the designated marker is the blue triangular decal. Are they physically attached to the same device enclosure, even if on different faces? Use visible enclosure boundaries. Same color, logo, and proximity alone are insufficient. Answer exactly one label: same, distinct, or unknown. Use unknown if the enclosure or designated parts cannot be resolved."
+}
